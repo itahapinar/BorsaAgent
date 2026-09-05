@@ -41,3 +41,34 @@ async def test_hicbir_aracta_market_parametresi_yok():
     """Kodda 'bist' sabit; model BIST disina cikamaz."""
     for arac in await sunucu.list_tools():
         assert "market" not in arac.inputSchema.get("properties", {})
+
+
+ANALIZ_VE_MAKRO = {
+    "teknik_analiz",
+    "hisse_karsilastir",
+    "sektor_karsilastirma",
+    "hisse_tarama",
+    "endeks_verisi",
+    "doviz_altin",
+    "makro_gosterge",
+}
+
+
+@pytest.mark.asyncio
+async def test_toplam_16_arac_kayitli():
+    adlar = {a.name for a in await sunucu.list_tools()}
+    assert CEKIRDEK | ANALIZ_VE_MAKRO == adlar
+    assert len(adlar) == 16
+
+
+@pytest.mark.asyncio
+async def test_analist_gorusu_araci_yok():
+    """Bilincli karar: guvenilir kaynagi yok, uydurma arac modeli yaniltir."""
+    adlar = {a.name for a in await sunucu.list_tools()}
+    assert "analist_gorusu" not in adlar
+
+
+@pytest.mark.asyncio
+async def test_hisse_karsilastir_liste_alir():
+    arac = next(a for a in await sunucu.list_tools() if a.name == "hisse_karsilastir")
+    assert arac.inputSchema["properties"]["kodlar"]["type"] == "array"

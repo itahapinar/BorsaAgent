@@ -279,6 +279,178 @@ async def kap_bildirim_detay(bildirim_no: str) -> dict:
     return await kap.bildirim_detay(bildirim_no)
 
 
+# --------------------------------------------------------------------------
+# Analiz ve piyasa araclari
+# --------------------------------------------------------------------------
+
+# Olculdu: BIST endeksleri Yahoo'da "XU100.IS" formatinda; "^XU100" bos doner.
+ENDEKSLER = {
+    "XU100": "BIST 100",
+    "XU030": "BIST 30",
+    "XU050": "BIST 50",
+    "XBANK": "BIST Bankacılık",
+    "XUSIN": "BIST Sınai",
+    "XUTEK": "BIST Teknoloji",
+    "XUMAL": "BIST Mali",
+}
+
+
+@sunucu.tool()
+async def teknik_analiz(kod: str) -> dict:
+    """RSI, MACD, 20/50/200 gunluk hareketli ortalamalar ve destek/direnc.
+
+    Son bir yillik fiyat verisine dayanir. Yorumu sun ama al/sat tavsiyesi
+    verme.
+    """
+    import datetime as dt
+
+    from bist_mcp import teknik
+
+    bugun = dt.date.today()
+    mumlar = await fiyat.gecmis(kod, str(bugun - dt.timedelta(days=400)), str(bugun))
+    if not mumlar:
+        return {"hata": f"{kod.upper()} icin fiyat gecmisi bulunamadi."}
+
+    kapanislar = [m["kapanis"] for m in mumlar]
+    return {
+        "kod": kod.upper(),
+        "son_kapanis": kapanislar[-1],
+        "rsi_14": teknik.rsi(kapanislar),
+        "macd": teknik.macd(kapanislar),
+        "ma_20": teknik.hareketli_ortalama(kapanislar, 20),
+        "ma_50": teknik.hareketli_ortalama(kapanislar, 50),
+        "ma_200": teknik.hareketli_ortalama(kapanislar, 200),
+        "son_3ay_destek_direnc": teknik.destek_direnc(mumlar[-63:]),
+    }
+
+
+@sunucu.tool()
+async def hisse_karsilastir(kodlar: list[str]) -> list[dict]:
+    """Iki ile bes hisseyi temel oranlariyla yan yana koyar.
+
+    'X mi Y mi daha ucuz', 'bunlari karsilastir' sorularinda kullan.
+    """
+    secilen = [k.strip().upper() for k in kodlar][:5]
+    if len(secilen) < 2:
+        return [{"hata": "en az iki hisse kodu gerekli"}]
+    return list(await asyncio.gather(*(finansal_oranlar(kod) for kod in secilen)))
+
+
+@sunucu.tool()
+async def sektor_karsilastirma(kod: str) -> dict:
+    """Hissenin kendi sektorundeki konumu: sektor ortalamasi ve akran sayisi.
+
+    BIST-100 gorunumune dayanir; kapsam disi hisselerde akran bulunamayabilir.
+    """
+    bilgi = await fiyat.sirket_bilgi(kod)
+    sektor = bilgi.get("sector")
+    if not sektor:
+        return {"hata": f"{kod.upper()} icin sektor bilgisi bulunamadi."}
+
+    akranlar = gorunum.satirlari_sec(sektor=sektor, adet=100)
+    if not akranlar:
+        return {
+            "kod": kod.upper(),
+            "sektor": sektor,
+            "hata": "Sektor tablosu henuz kurulmadi ya da bu sektorde BIST-100 "
+            "hissesi yok. Tekil oranlar icin finansal_oranlar kullan.",
+        }
+
+    fkler = [a["fk"] for a in akranlar if a["fk"]]
+    pdddler = [a["pddd"] for a in akranlar if a["pddd"]]
+    return {
+        "kod": kod.upper(),
+        "sektor": sektor,
+        "sektordeki_sirket_sayisi": len(akranlar),
+        "sektor_ortalama_fk": round(sum(fkler) / len(fkler), 2) if fkler else None,
+        "sektor_ortalama_pddd": round(sum(pdddler) / len(pdddler), 2) if pdddler else None,
+        "kapsam": "BIST-100",
+    }
+
+
+@sunucu.tool()
+async def hisse_tarama(
+    fk_max: float | None = None,
+    fk_min: float | None = None,
+    pddd_max: float | None = None,
+    temettu_verimi_min: float | None = None,
+    piyasa_degeri_min: float | None = None,
+    sektor: str | None = None,
+    sirala: str = "piyasa_degeri",
+    adet: int = 20,
+) -> dict:
+    """Verilen kriterlere uyan hisseleri listeler. Kriterler VE ile birlesir.
+
+    ONEMLI: Sonuclar BIST-100 ile SINIRLIDIR; cevapta bunu mutlaka belirt.
+    temettu_verimi_min yuzde olarak verilir (ornek: 5 = %5).
+    sirala: fk, pddd, temettu_verimi veya piyasa_degeri.
+    """
+    satirlar = gorunum.satirlari_sec(
+        fk_max=fk_max,
+        fk_min=fk_min,
+        pddd_max=pddd_max,
+        temettu_verimi_min=temettu_verimi_min,
+        piyasa_degeri_min=piyasa_degeri_min,
+        sektor=sektor,
+        sirala=sirala,
+        adet=adet,
+    )
+    yas = gorunum.yas_saat()
+    if yas is None:
+        return {
+            "hata": "Tarama tablosu henuz kurulmadi. Sunucu acilisinda arka planda "
+            "kuruluyor, yaklasik bir dakika surer. Biraz sonra tekrar dene."
+        }
+    return {
+        "kapsam": "BIST-100",
+        "veri_yasi_saat": round(yas, 1),
+        "sonuc_sayisi": len(satirlar),
+        "hisseler": satirlar,
+    }
+
+
+@sunucu.tool()
+async def endeks_verisi(endeks: str = "XU100") -> dict:
+    """BIST endekslerinin guncel degeri.
+
+    Gecerli: XU100, XU030, XU050, XBANK (bankacilik), XUSIN (sinai),
+    XUTEK (teknoloji), XUMAL (mali).
+    """
+    ad = endeks.strip().upper()
+    if ad not in ENDEKSLER:
+        return {"hata": f"gecersiz endeks: {endeks}. Gecerli: {', '.join(ENDEKSLER)}"}
+    sonuc = await fiyat.anlik(ad)
+    if not sonuc:
+        return {"hata": f"{ad} icin veri alinamadi."}
+    sonuc["ad"] = ENDEKSLER[ad]
+    return sonuc
+
+
+@sunucu.tool()
+async def doviz_altin(varlik: str = "usdtry") -> dict:
+    """Doviz kuru, altin ve emtia fiyati.
+
+    Gecerli: usdtry, eurtry, gram_altin, ons_altin, gumus, brent.
+    Gram altin ons fiyati ve USD/TRY kurundan hesaplanir; dayanak degerler
+    cevapta yer alir.
+    """
+    return await kur.kur(varlik)
+
+
+@sunucu.tool()
+async def makro_gosterge(gosterge: str = "tufe", son_kayit: int = 12) -> dict:
+    """TCMB makro gostergeleri: tufe, ufe, politika_faizi, tahvil_2y.
+
+    Enflasyona gore reel getiri sorularinda tufe ile birlikte kullan.
+    Doviz ve altin icin bunu DEGIL, doviz_altin aracini kullan.
+    """
+    from bist_mcp.kaynaklar.tcmb import GOSTERGELER
+
+    if gosterge.strip().lower() not in GOSTERGELER:
+        return {"hata": f"gecersiz gosterge. Gecerli: {', '.join(sorted(GOSTERGELER))}"}
+    return await tcmb.gosterge(gosterge, son_kayit)
+
+
 def main() -> None:
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO"),
