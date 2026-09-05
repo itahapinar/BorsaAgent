@@ -115,6 +115,41 @@ def sifir_satirlari_at(kalemler: list[dict]) -> list[dict]:
     return [k for k in kalemler if any(d not in (0, None) for d in k["degerler"])]
 
 
+# Is Yatirim bilanco, gelir ve nakit akisini TEK listede dondurur. Bolme
+# noktalari olculdu (THYAO sanayi 104 kalem, GARAN banka 99 kalem):
+#   bilanco sonu  -> "TOPLAM KAYNAKLAR" (sanayi) / "PASİF TOPLAMI" (banka)
+#   nakit basi    -> "İşletme Faaliyetlerinden Kaynaklanan Net Nakit"
+# Bankalarda nakit akisi bolumu YOKTUR; GARAN gelir tablosuyla bitiyor.
+BILANCO_SONU_ADLARI = ("TOPLAM KAYNAKLAR", "PASİF TOPLAMI")
+NAKIT_BASI_ADLARI = ("İşletme Faaliyetlerinden Kaynaklanan Net Nakit",)
+
+
+def _ilk_indeks(kalemler: list[dict], adaylar: tuple[str, ...]) -> int | None:
+    for i, kalem in enumerate(kalemler):
+        if kalem["ad"].strip() in adaylar:
+            return i
+    return None
+
+
+def tablo_bol(kalemler: list[dict]) -> dict[str, list[dict]]:
+    """Duz kalem listesini bilanco / gelir / nakit bolumlerine ayirir.
+
+    Isaret bulunamazsa o bolum bos doner — uydurma bolme yapilmaz.
+    """
+    bilanco_son = _ilk_indeks(kalemler, BILANCO_SONU_ADLARI)
+    nakit_bas = _ilk_indeks(kalemler, NAKIT_BASI_ADLARI)
+
+    if bilanco_son is None:
+        return {"bilanco": [], "gelir": kalemler, "nakit": []}
+
+    gelir_son = nakit_bas if nakit_bas is not None else len(kalemler)
+    return {
+        "bilanco": kalemler[: bilanco_son + 1],
+        "gelir": kalemler[bilanco_son + 1 : gelir_son],
+        "nakit": kalemler[nakit_bas:] if nakit_bas is not None else [],
+    }
+
+
 def kalem_bul(kalemler: list[dict], *adaylar: str) -> float | None:
     """Verilen adaylardan ilk eslesenin ilk donem degerini doner."""
     for aday in adaylar:

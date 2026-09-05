@@ -8,6 +8,7 @@ from bist_mcp.kaynaklar.isyatirim import (
     kalem_bul,
     sayiya_cevir,
     sifir_satirlari_at,
+    tablo_bol,
 )
 
 HAM_YANIT = {
@@ -143,3 +144,45 @@ def test_string_sifir_satiri_da_atilir():
 
 def test_turkce_ondalik_formati_da_cozulur():
     assert sayiya_cevir("1.234.567,89") == 1234567.89
+
+
+# --- Tablo bolme: Is Yatirim bilanco+gelir+nakit'i TEK listede donduruyor ---
+
+SANAYI_KALEMLERI = [
+    {"ad": "Dönen Varlıklar", "degerler": [1]},
+    {"ad": "TOPLAM KAYNAKLAR", "degerler": [2]},
+    {"ad": "BRÜT KAR (ZARAR)", "degerler": [3]},
+    {"ad": "DÖNEM KARI (ZARARI)", "degerler": [4]},
+    {"ad": "İşletme Faaliyetlerinden Kaynaklanan Net Nakit", "degerler": [5]},
+    {"ad": "Dönem Sonu Nakit", "degerler": [6]},
+]
+
+BANKA_KALEMLERI = [
+    {"ad": "AKTİF TOPLAMI", "degerler": [1]},
+    {"ad": "XVI. ÖZKAYNAKLAR", "degerler": [2]},
+    {"ad": "PASİF TOPLAMI", "degerler": [3]},
+    {"ad": "I. FAİZ GELİRLERİ", "degerler": [4]},
+    {"ad": "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)", "degerler": [5]},
+]
+
+
+def test_sanayi_tablosu_uce_bolunur():
+    b = tablo_bol(SANAYI_KALEMLERI)
+    assert [k["ad"] for k in b["bilanco"]] == ["Dönen Varlıklar", "TOPLAM KAYNAKLAR"]
+    assert [k["ad"] for k in b["gelir"]] == ["BRÜT KAR (ZARAR)", "DÖNEM KARI (ZARARI)"]
+    assert len(b["nakit"]) == 2
+
+
+def test_banka_tablosunda_nakit_bolumu_yok():
+    """Olculdu: GARAN gelir tablosuyla bitiyor, nakit akisi bolumu yok."""
+    b = tablo_bol(BANKA_KALEMLERI)
+    assert b["bilanco"][-1]["ad"] == "PASİF TOPLAMI"
+    assert len(b["gelir"]) == 2
+    assert b["nakit"] == []
+
+
+def test_isaret_yoksa_uydurma_bolme_yapilmaz():
+    kalemler = [{"ad": "Bilinmeyen Kalem", "degerler": [1]}]
+    b = tablo_bol(kalemler)
+    assert b["bilanco"] == []
+    assert b["nakit"] == []
