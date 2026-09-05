@@ -7,6 +7,8 @@ from bist_mcp.kaynaklar.isyatirim import (
     kalem_ayikla,
     kalem_bul,
     sayiya_cevir,
+    net_kar_ttm,
+    guncel_donem_sec,
     sifir_satirlari_at,
     tablo_bol,
 )
@@ -186,3 +188,58 @@ def test_isaret_yoksa_uydurma_bolme_yapilmaz():
     b = tablo_bol(kalemler)
     assert b["bilanco"] == []
     assert b["nakit"] == []
+
+
+# --- Donem semantigi: ozkaynak STOK, net kar AKIS ---
+# Olculdu (BETAE, 06.09.2026) - gercek degerler: PD/DD 5,59 / F/K 44,27
+#   ozkaynak 2025 yillik  3.602.650.175  -> PD/DD 9,08  YANLIS
+#   ozkaynak 2026 ilk 6ay 5.849.988.146  -> PD/DD 5,59  DOGRU
+#   net kar  2025 yillik  1.079.327.517  -> F/K   30,32 YANLIS
+#   net kar  TTM            739.138.194  -> F/K   44,27 DOGRU
+
+BETAE_H1_2026 = 52_057_130
+BETAE_H1_2025 = 392_246_453
+BETAE_YIL_2025 = 1_079_327_517
+
+
+def test_ttm_gecen_yil_ayni_donemi_cikarip_bu_yili_ekler():
+    """REGRESYON: yillik kari kullanmak BETAE'de F/K'yi 30,32 gosteriyordu.
+
+    Dogru pencere: gecen yil yillik - gecen yil ayni kumulatif + bu yil kumulatif
+    """
+    sonuc = net_kar_ttm(
+        bu_yil_kumulatif=BETAE_H1_2026,
+        gecen_yil_ayni_kumulatif=BETAE_H1_2025,
+        gecen_yil_yillik=BETAE_YIL_2025,
+        ay=6,
+    )
+    assert round(sonuc) == 739_138_194
+    piyasa_degeri = 80.8 * 405_000_000
+    assert round(piyasa_degeri / sonuc, 2) == 44.27
+
+
+def test_donem_yillikse_ttm_dogrudan_o_degerdir():
+    """Aralik kumulatifi zaten 12 aylik; duzeltme gerekmez."""
+    sonuc = net_kar_ttm(
+        bu_yil_kumulatif=BETAE_YIL_2025,
+        gecen_yil_ayni_kumulatif=None,
+        gecen_yil_yillik=None,
+        ay=12,
+    )
+    assert sonuc == BETAE_YIL_2025
+
+
+def test_eksik_gecmis_veride_ttm_none():
+    """Gecen yilin verisi yoksa uydurma yapilmaz."""
+    assert net_kar_ttm(BETAE_H1_2026, None, BETAE_YIL_2025, ay=6) is None
+    assert net_kar_ttm(BETAE_H1_2026, BETAE_H1_2025, None, ay=6) is None
+
+
+def test_guncel_donem_en_yeni_dolu_olani_secer():
+    """2026/12 ve 2026/9 henuz yayimlanmamis; en yenisi 2026/6."""
+    dolu = {(2026, 6): 100.0, (2026, 3): 50.0, (2025, 12): 200.0}
+    assert guncel_donem_sec(dolu) == (2026, 6)
+
+
+def test_guncel_donem_bos_sozlukte_none():
+    assert guncel_donem_sec({}) is None

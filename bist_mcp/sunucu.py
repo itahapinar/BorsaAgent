@@ -16,15 +16,10 @@ from typing import Literal
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from bist_mcp.anlik_gorunum import (
-    NET_KAR_ADLARI,
-    OZKAYNAK_ADLARI,
-    AnlikGorunum,
-    satir_hesapla,
-)
+from bist_mcp.anlik_gorunum import AnlikGorunum, satir_hesapla
 from bist_mcp.evren import tarama_evreni
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
-from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, kalem_bul, tablo_bol
+from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
 from bist_mcp.kaynaklar.kur import KurKaynak
 from bist_mcp.kaynaklar.tcmb import TcmbIstemci
@@ -214,14 +209,13 @@ async def finansal_oranlar(kod: str) -> dict:
     raporlayan sirketlerde (ornegin THYAO) 49 kata varan hata veriyor.
     """
     sirket = await _sirket(kod)
-    veri = await isyatirim.mali_tablo(kod, sirket.tip if sirket else None)
+    girdiler = await isyatirim.oran_girdileri(kod, sirket.tip if sirket else None)
     bilgi = await fiyat.sirket_bilgi(kod)
     anlik = await fiyat.anlik(kod)
     if not anlik:
         return {"hata": f"{kod.upper()} icin fiyat verisi bulunamadi."}
 
     toplu = await fiyat.toplu([kod])
-    kalemler = veri["kalemler"]
 
     satir = satir_hesapla(
         {
@@ -229,15 +223,17 @@ async def finansal_oranlar(kod: str) -> dict:
             "unvan": sirket.unvan if sirket else None,
             "sektor": bilgi.get("sector"),
             "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
-            "ozkaynak_tl": kalem_bul(kalemler, *OZKAYNAK_ADLARI),
-            "net_kar_tl": kalem_bul(kalemler, *NET_KAR_ADLARI),
+            # Ozkaynak STOK -> guncel bilanco; net kar AKIS -> son 12 ay
+            "ozkaynak_tl": girdiler["ozkaynak_tl"],
+            "net_kar_tl": girdiler["net_kar_ttm"],
         },
         anlik["fiyat"],
         toplu.get(kod.strip().upper(), {}).get("temettu_12ay", 0.0),
         toplu.get(kod.strip().upper(), {}).get("ortalama_hacim_tl"),
     )
     satir.pop("guncelleme", None)
-    satir["donemler"] = veri["donemler"]
+    satir["ozkaynak_donemi"] = girdiler["ozkaynak_donem"]
+    satir["net_kar_donemi"] = girdiler["net_kar_aciklama"]
     return satir
 
 

@@ -151,6 +151,51 @@ def tablo_bol(kalemler: list[dict]) -> dict[str, list[dict]]:
     }
 
 
+# Sanayi ve banka (BDDK) tablolarinda ayni kavramin farkli adlari.
+# Burada tanimli cunku kaynagin bicimine ait bir bilgi.
+OZKAYNAK_ADLARI = ("XVI. ÖZKAYNAKLAR", "Özkaynaklar")
+NET_KAR_ADLARI = (
+    "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
+    "DÖNEM KARI (ZARARI)",
+    "Dönem Karı (Zararı)",
+)
+
+
+def guncel_donem_sec(dolu_donemler: dict[tuple[int, int], float]) -> tuple[int, int] | None:
+    """Verisi olan donemlerden en yenisini secer."""
+    return max(dolu_donemler) if dolu_donemler else None
+
+
+def net_kar_ttm(
+    bu_yil_kumulatif: float | None,
+    gecen_yil_ayni_kumulatif: float | None,
+    gecen_yil_yillik: float | None,
+    ay: int,
+) -> float | None:
+    """Son 12 ayin net kari.
+
+    NEDEN GEREKLI — net kar bir AKIS kalemidir, ozkaynak gibi bir bakiye
+    degildir. Gecen yilin tam yil karini bugunun fiyatina bolmek de, bu
+    yilin 6 aylik karini bolmek de yanlistir.
+
+    Is Yatirim donemleri KUMULATIF verir (period=6 -> yilin ilk 6 ayi), bu
+    yuzden formul:
+        TTM = gecen yil yillik - gecen yil ayni kumulatif + bu yil kumulatif
+
+    Olculdu (BETAE, 06.09.2026):
+        2025 yillik 1.079.327.517 - 2025 ilk 6 ay 392.246.453
+        + 2026 ilk 6 ay 52.057.130 = 739.138.194  -> F/K 44,27 (dogru)
+        Yillik kari kullanmak F/K'yi 30,32 gosteriyordu (yanlis).
+    """
+    if bu_yil_kumulatif is None:
+        return None
+    if ay == 12:
+        return bu_yil_kumulatif  # Aralik kumulatifi zaten 12 aylik
+    if gecen_yil_ayni_kumulatif is None or gecen_yil_yillik is None:
+        return None  # eksik gecmis: uydurma yapma
+    return gecen_yil_yillik - gecen_yil_ayni_kumulatif + bu_yil_kumulatif
+
+
 def kalem_bul(kalemler: list[dict], *adaylar: str) -> float | None:
     """Verilen adaylardan ilk eslesenin ilk donem degerini doner."""
     for aday in adaylar:
@@ -170,6 +215,18 @@ class IsYatirimIstemci:
         await self._sinirlayici.bekle()
 
     async def _getir(self, kod: str, grup: str, donemler: list[tuple[int, int]]) -> dict:
+        """Is Yatirim MaliTablo cagrisi.
+
+        DIKKAT — endpoint TAM 4 DONEM istiyor. Olculdu: 2 ya da 3 donemle
+        istek atilinca hata vermiyor, sessizce BOS liste donuyor. Eksik
+        gelen pencere burada doldurulur ki hicbir cagiran bu tuzaga
+        dusmesin.
+        """
+        donemler = list(donemler[:SLOT_SAYISI])
+        while len(donemler) < SLOT_SAYISI and donemler:
+            son_yil, son_ay = donemler[-1]
+            donemler.append((son_yil - 1, son_ay))
+
         parametreler = {
             "companyCode": kod.upper(),
             "exchange": "TRY",
@@ -200,6 +257,78 @@ class IsYatirimIstemci:
         kalemler = sifir_satirlari_at(kalem_ayikla(ham, slotlar))
         etiketler = [pencere[i - 1] for i in slotlar]
         return kalemler, etiketler, grup
+
+    @staticmethod
+    def _slot_degeri(ham: dict, slot: int, adaylar: tuple[str, ...]) -> float | None:
+        """Belirli bir slottaki (donemdeki) kalem degeri."""
+        for aday in adaylar:
+            for satir in ham.get("value") or []:
+                if (satir.get("itemDescTr") or "").strip().upper() == aday.strip().upper():
+                    deger = sayiya_cevir(satir.get(f"value{slot}"))
+                    if deger is not None:
+                        return deger
+        return None
+
+    async def oran_girdileri(self, kod: str, tip: str | None) -> dict:
+        """PD/DD ve F/K icin DOGRU DONEMDEKI girdileri doner.
+
+        Iki kalem turu farkli donem mantigi ister:
+          * ozkaynak bir STOK (bakiye) -> en guncel bilanco kullanilir
+          * net kar bir AKIS -> son 12 ay (TTM) hesaplanir
+
+        Olculdu (BETAE): yillik ozkaynak PD/DD'yi 9,08 gosteriyordu, guncel
+        bilancoyla 5,59 (dogru). Yillik kar F/K'yi 30,32 gosteriyordu, TTM
+        ile 44,27 (dogru).
+        """
+        bugun = dt.date.today()
+        bu_yil_pencere = [(bugun.year, ay) for ay in (12, 9, 6, 3)]
+
+        for grup in (tablo_grubu_sec(tip), yedek_grup(tablo_grubu_sec(tip))):
+            ham = await self._getir(kod, grup, bu_yil_pencere)
+            slotlar = dolu_slotlar(ham)
+            if not slotlar:
+                # Bu yil hic yayin yok: gecen yila dus
+                gecen = [(bugun.year - 1, ay) for ay in (12, 9, 6, 3)]
+                ham = await self._getir(kod, grup, gecen)
+                slotlar = dolu_slotlar(ham)
+                bu_yil_pencere = gecen
+                if not slotlar:
+                    continue
+
+            slot = min(slotlar)  # en yeni donem ilk slotta
+            yil, ay = bu_yil_pencere[slot - 1]
+            ozkaynak = self._slot_degeri(ham, slot, OZKAYNAK_ADLARI)
+            kar_kumulatif = self._slot_degeri(ham, slot, NET_KAR_ADLARI)
+
+            net_kar = net_kar_ttm(kar_kumulatif, None, None, ay)
+            if net_kar is None and kar_kumulatif is not None:
+                # Kumulatif donem yil sonu degil: gecen yilin ayni donemi ve
+                # yilligi gerekiyor. Ikisi tek istekte alinir.
+                gecmis_pencere = [(yil - 1, ay), (yil - 1, 12)]
+                gecmis = await self._getir(kod, grup, gecmis_pencere)
+                net_kar = net_kar_ttm(
+                    kar_kumulatif,
+                    self._slot_degeri(gecmis, 1, NET_KAR_ADLARI),
+                    self._slot_degeri(gecmis, 2, NET_KAR_ADLARI),
+                    ay,
+                )
+
+            if ozkaynak is not None or net_kar is not None:
+                return {
+                    "ozkaynak_tl": ozkaynak,
+                    "ozkaynak_donem": donem_etiketi(yil, ay, "ceyreklik" if ay != 12 else "yillik"),
+                    "net_kar_ttm": net_kar,
+                    "net_kar_aciklama": (
+                        f"{yil} yıllık" if ay == 12 else f"son 12 ay ({yil}/{ay:02d} itibarıyla)"
+                    ),
+                }
+
+        return {
+            "ozkaynak_tl": None,
+            "ozkaynak_donem": None,
+            "net_kar_ttm": None,
+            "net_kar_aciklama": None,
+        }
 
     async def mali_tablo(
         self, kod: str, tip: str | None, donem: str = "yillik", adet: int = 2

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from bist_mcp.hesap import fk, pddd, piyasa_degeri, temettu_verimi
-from bist_mcp.kaynaklar.isyatirim import kalem_bul
+from bist_mcp.kaynaklar.isyatirim import NET_KAR_ADLARI, OZKAYNAK_ADLARI  # noqa: F401
 
 SUTUNLAR = (
     "kod",
@@ -36,15 +36,6 @@ SUTUNLAR = (
 # 630 hisselik tam kurulumda tum gorevleri ayni anda baslatmak, hiz
 # sinirlayiciyi kuyruga sokmasa bile yuzlerce acik baglanti demek.
 ES_ZAMANLI_TAVAN = 8
-
-# Sanayi ve banka (BDDK) tablolarinda ayni kavramin farkli adlari.
-OZKAYNAK_ADLARI = ("XVI. ÖZKAYNAKLAR", "Özkaynaklar")
-NET_KAR_ADLARI = (
-    "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
-    "DÖNEM KARI (ZARARI)",
-    "Dönem Karı (Zararı)",
-)
-
 
 def satir_hesapla(
     temel: dict, fiyat: float, temettu_12ay: float, ortalama_hacim_tl: float | None = None
@@ -194,11 +185,10 @@ class AnlikGorunum:
                 sirket = dizin.get(kod)
                 piyasa = toplu[kod]
 
-                tablo, bilgi = await asyncio.gather(
-                    self._isyatirim.mali_tablo(kod, sirket.tip if sirket else None),
+                girdiler, bilgi = await asyncio.gather(
+                    self._isyatirim.oran_girdileri(kod, sirket.tip if sirket else None),
                     self._fiyat.sirket_bilgi(kod),
                 )
-                kalemler = tablo["kalemler"]
 
                 return satir_hesapla(
                     {
@@ -206,8 +196,9 @@ class AnlikGorunum:
                         "unvan": sirket.unvan if sirket else None,
                         "sektor": bilgi.get("sector"),
                         "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
-                        "ozkaynak_tl": kalem_bul(kalemler, *OZKAYNAK_ADLARI),
-                        "net_kar_tl": kalem_bul(kalemler, *NET_KAR_ADLARI),
+                        # Ozkaynak STOK -> guncel bilanco; net kar AKIS -> TTM
+                        "ozkaynak_tl": girdiler["ozkaynak_tl"],
+                        "net_kar_tl": girdiler["net_kar_ttm"],
                     },
                     piyasa["fiyat"],
                     piyasa["temettu_12ay"],

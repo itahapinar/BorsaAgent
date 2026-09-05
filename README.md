@@ -68,7 +68,26 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    ASELS'te yfinance ile uyumluyuz. Yani katman rastgele değil, tam olarak
    para birimi uyuşmazlığının olduğu yerde ayrışıyor.
 
-2. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
+2. **Özkaynak STOK, net kâr AKIŞ — dönem mantıkları farklı.** Özkaynak bir
+   bakiye, o anki değeri geçerli → **en güncel bilanço** kullanılır. Net kâr
+   bir akış → **son 12 ay (TTM)** hesaplanır:
+   `TTM = geçen yıl yıllık − geçen yıl aynı kümülatif + bu yıl kümülatif`.
+
+   Ölçüldü (BETAE, 06.09.2026) — gerçek değerler PD/DD 5,59 / F/K 44,27:
+
+   | Girdi | Yanlış (yıllık) | Doğru | Sonuç |
+   |---|---|---|---|
+   | Özkaynak | 3,60 mlr (2025) | 5,85 mlr (2026/6) | PD/DD 9,08 → **5,59** |
+   | Net kâr | 1,08 mlr (2025) | 739 mn (TTM) | F/K 30,32 → **44,27** |
+
+   İkisini de yıllık almak her hisseyi etkiliyordu; şirket büyüdükçe PD/DD
+   şişiyor, kâr daraldıkça F/K olduğundan düşük görünüyordu.
+
+3. **İş Yatırım MaliTablo TAM 4 DÖNEM istiyor.** 2 ya da 3 dönemle istek
+   hata vermiyor, sessizce **boş liste** dönüyor. `_getir` eksik pencereyi
+   otomatik dolduruyor ki hiçbir çağıran bu tuzağa düşmesin.
+
+4. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
    **isim aramasıdır**: `member/filter/GARAN` sekiz sonuç döndürüyor ve ilki
    "GARANTİ BBVA OPERASYONEL KİRALAMA"; doğru banka sekizinci sırada.
 
