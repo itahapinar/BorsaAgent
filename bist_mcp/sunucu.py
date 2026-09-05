@@ -234,6 +234,7 @@ async def finansal_oranlar(kod: str) -> dict:
         },
         anlik["fiyat"],
         toplu.get(kod.strip().upper(), {}).get("temettu_12ay", 0.0),
+        toplu.get(kod.strip().upper(), {}).get("ortalama_hacim_tl"),
     )
     satir.pop("guncelleme", None)
     satir["donemler"] = veri["donemler"]
