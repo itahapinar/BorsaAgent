@@ -54,8 +54,26 @@ BIST üzerinde ölçüldü (THYAO, GARAN, ASELS):
 
 **PD/DD hatasının kökü tespit edildi:** THYAO finansallarını USD raporluyor
 (`financialCurrency: USD`), hissesi TRY işlem görüyor. yfinance 296 TL fiyatı
-15,53 **dolarlık** defter değerine bölüyor. Aynı hata USD raporlayan tüm BIST
-şirketlerinde (EREGL, TUPRS vb.) sistematiktir.
+15,53 **dolarlık** defter değerine bölüyor.
+
+**Kapsam düzeltmesi (uygulama sırasında ölçüldü):** Bu spec'in ilk halinde
+"EREGL, TUPRS vb." de USD raporlayan örnekler olarak gösterilmişti; **yanlıştı**.
+15 büyük BIST hissesi tarandı, `financialCurrency != currency` olan **yalnızca
+THYAO** çıktı. Uçtan uca karşılaştırma:
+
+| Hisse | Bizim PD/DD | yfinance | Sapma |
+|---|---|---|---|
+| **THYAO** | **0,38** | **18,64** | **49x** |
+| EREGL | 0,71 | 0,78 | ~1x |
+| TUPRS | 1,72 | 1,64 | ~1x |
+| GARAN | 1,24 | 1,13 | ~1x |
+| ASELS | 5,97 | 5,77 | ~1x |
+
+Hata dar ama gerçek ve BIST-100'ün en çok işlem gören hisselerinden birini
+vuruyor. Tablo aynı zamanda oran katmanının doğruluk kanıtı: yfinance'ten
+rastgele değil, **tam olarak para birimi uyuşmazlığının olduğu yerde**
+ayrışıyor. Oranları kendimiz hesaplama kararı ayrıca zorunlu, çünkü TL
+finansal tablolar (banka bilançosu dahil) zaten İş Yatırım'dan geliyor.
 
 Gerçek değer İş Yatırım'dan doğrulandı: özkaynak **1.073.081.134.047 TL**,
 hisse adedi 1.372.283.353 → defter değeri 781,96 TL → PD/DD = **0,38**.

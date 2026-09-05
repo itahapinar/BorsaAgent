@@ -656,10 +656,30 @@ git commit -m "feat: KAP istemcisi - oturum isitma, hiz siniri, bildirim sorgusu
 **Interfaces:**
 - Consumes: `tablo_grubu_sec`, `yedek_grup` (Task 2), `Onbellek` (Task 1)
 - Produces: `IsYatirimIstemci(onbellek)` sınıfı,
-  `async mali_tablo(kod: str, tip: str | None, donem: str = "yillik", adet: int = 2) -> list[dict]`,
-  saf fonksiyonlar `kalem_ayikla(ham: dict) -> list[dict]`,
-  `sifir_satirlari_at(kalemler: list[dict]) -> list[dict]`,
-  `kalem_bul(kalemler: list[dict], *adaylar: str) -> float | None`
+  `async mali_tablo(kod, tip, donem="yillik", adet=2) -> dict` —
+  **`{"donemler": list[str], "kalemler": list[dict]}`** döner (düz liste değil;
+  model rakamın hangi döneme ait olduğunu söylemek zorunda, spec §8),
+  saf fonksiyonlar `sayiya_cevir(ham) -> float | None`,
+  `dolu_slotlar(ham: dict) -> list[int]`,
+  `donem_adaylari(donem: str, bugun: date | None) -> list[tuple[int, int]]`,
+  `donem_etiketi(yil, ay, donem) -> str`,
+  `kalem_ayikla(ham: dict, slotlar: list[int] | None = None) -> list[dict]`,
+  `sifir_satirlari_at(kalemler) -> list[dict]`,
+  `kalem_bul(kalemler, *adaylar) -> float | None`
+
+**Uygulama sırasında ölçümle bulunan üç sapma** (plan yazılırken bilinmiyordu):
+
+1. **Dönem takvimle hesaplanamaz.** 2026-09-05'te ölçüldü: `2026/12` ve
+   `2026/9` boş döner (henüz yayımlanmadı), `2026/6` ve `2025/12` dolu.
+   Şirketler farklı tarihlerde açıkladığı için tarih aritmetiği kırılgan.
+   Çözüm: aday dönemler istenir, **tamamen boş slotlar atılır**. Karışık
+   pencerede yayımlanmamış dönem `None` gelir, diğerleri dolu (ölçüldü).
+2. **Değerler slot bazında hizalanmalı.** Satır bazında `None` atmak
+   hatalıydı: slot4'te 145, diğerlerinde 147 kalem dolu; o iki satırda
+   değerler bir dönem kayıyordu.
+3. **Değerler STRING geliyor** (`'1073081134047'`, `'-941964141907'`).
+   Çevrilmezse oran hesabı bölemez ve `'0' != 0` olduğu için sıfır
+   satırları hiç atılmaz.
 
 - [ ] **Step 1: Başarısız testi yaz**
 
