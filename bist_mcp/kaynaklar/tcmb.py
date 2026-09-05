@@ -6,17 +6,29 @@ geliyor. EVDS yalnizca yfinance karsiligi olmayan veriler icin kullanilir.
 EVDS_API_KEY yoksa modul kendini devre disi birakir ve net bir mesaj doner;
 diger 15 arac etkilenmez.
 
-UYARI — asagidaki seri kodlari CANLI DOGRULANMADI. Anahtar olmadigi icin
-istek atilamadi. Anahtar alindiginda `python -m bist_mcp.kaynaklar.tcmb`
-ile her gosterge tek tek denenmeli; yanlis kod bos `kayitlar` dondurur,
-sessizce yanlis sayi dondurmez.
+DURUM — 2026-09-06 itibariyla BU ARAC CALISMIYOR, sebebi anahtar degil.
+Gercek bir EVDS anahtariyla olculdu:
+
+  * evds2.tcmb.gov.tr -> evds3.tcmb.gov.tr'ye 302 yonlendiriyor (TCMB
+    EVDS v3'e gecmis).
+  * evds3.tcmb.gov.tr/service/evds/... yolu JSON degil, web uygulamasinin
+    HTML'ini donduruyor (HTTP 200, content-type text/html).
+  * Bes ayri baslik adi denendi (key, apikey, ApiKey, X-API-KEY,
+    Authorization) ve anahtarsiz istek — HEPSI ayni HTML'i donuyor. Yani
+    kimlik dogrulama sorunu degil, API yolu degismis.
+
+Seri kodlari da bu yuzden hala dogrulanamadi. v3'un dogru servis yolu
+bulununca EVDS_KOK ve gerekirse istek bicimi guncellenmeli.
+
+Bu arada arac COKMEZ: JSON gelmezse acik bir mesaj doner ve diger 15 arac
+etkilenmez.
 """
 
 import httpx
 
 from bist_mcp.onbellek import Onbellek
 
-EVDS_KOK = "https://evds2.tcmb.gov.tr/service/evds"
+EVDS_KOK = "https://evds3.tcmb.gov.tr/service/evds"
 MAKRO_TTL = 6 * 3600
 
 GOSTERGELER: dict[str, str] = {
@@ -79,13 +91,26 @@ class TcmbIstemci:
         if onbellekli is not None:
             return onbellekli
 
-        async with httpx.AsyncClient() as istemci:
-            yanit = await istemci.get(
-                f"{EVDS_KOK}/series={seri}&type=json&last_observations={son_kayit}",
-                headers={"key": self._anahtar, "User-Agent": "Mozilla/5.0"},
-                timeout=30.0,
-            )
-            yanit.raise_for_status()
+        async with httpx.AsyncClient(follow_redirects=True) as istemci:
+            try:
+                yanit = await istemci.get(
+                    f"{EVDS_KOK}/series={seri}&type=json&last_observations={son_kayit}",
+                    headers={"key": self._anahtar, "User-Agent": "Mozilla/5.0"},
+                    timeout=30.0,
+                )
+            except httpx.HTTPError as hata:
+                return {"hata": f"EVDS'e ulasilamadi: {type(hata).__name__}"}
+
+            # v3 gecisinden beri bu yol JSON degil HTML donuyor (bkz. modul
+            # basligi). Cokmek yerine ne oldugunu soyle.
+            if "json" not in yanit.headers.get("content-type", ""):
+                return {
+                    "hata": "EVDS servisi JSON yerine web sayfasi döndürdü. TCMB "
+                    "EVDS v3'e geçti ve API yolu değişmiş görünüyor; makro "
+                    "göstergeler şu an kullanılamıyor. Döviz ve altın bundan "
+                    "etkilenmez (doviz_altin aracını kullan)."
+                }
+
             kayitlar = evds_ayikla(yanit.json(), seri)
 
         if not kayitlar:

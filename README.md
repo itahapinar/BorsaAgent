@@ -12,7 +12,7 @@ Tasarım: `docs/superpowers/specs/2026-09-05-bist-telegram-agent-design.md`
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
-Copy-Item .env.example .env    # EVDS_API_KEY isteğe bağlı
+Copy-Item .env.example .env    # sonra .env'i doldur — GERÇEK ANAHTARLAR .env.example'A YAZILMAZ
 ```
 
 ## Test
@@ -150,11 +150,20 @@ KAP'ın `financialType` alanıyla şirket tipini eleyemiyoruz: 807 ticker'ın
 
 ## Bilinen eksikler
 
-- **`makro_gosterge` EVDS anahtarı ister.** `EVDS_API_KEY` yoksa açıklayıcı
-  mesaj döner, diğer 15 araç etkilenmez. Anahtar
-  [evds2.tcmb.gov.tr](https://evds2.tcmb.gov.tr) üzerinden ücretsiz alınır.
-  **EVDS seri kodları canlı doğrulanmadı** (anahtar olmadığı için istek
-  atılamadı); yanlış kod boş kayıt döndürür, sessizce yanlış sayı döndürmez.
+- **`makro_gosterge` şu an çalışmıyor — sebebi anahtar değil, TCMB'nin API
+  değişikliği.** Gerçek bir EVDS anahtarıyla ölçüldü (06.09.2026):
+  `evds2.tcmb.gov.tr` artık `evds3`'e 302 yönlendiriyor ve
+  `evds3.tcmb.gov.tr/service/evds/...` yolu JSON yerine web uygulamasının
+  HTML'ini döndürüyor. Beş farklı başlık adı (`key`, `apikey`, `ApiKey`,
+  `X-API-KEY`, `Authorization`) ve anahtarsız istek denendi — hepsi aynı
+  HTML. Yani kimlik doğrulama değil, **servis yolu değişmiş**.
+
+  Araç çökmüyor: durumu açıklayan bir mesaj döndürüyor ve diğer 15 araç
+  etkilenmiyor. v3'ün doğru servis yolu bulununca `bist_mcp/kaynaklar/tcmb.py`
+  içindeki `EVDS_KOK` güncellenmeli; seri kodları da o zaman doğrulanabilir.
+
+  **Enflasyon/faiz dışındaki her şey etkilenmiyor** — döviz, altın ve emtia
+  `doviz_altin` aracından yfinance üzerinden anahtarsız geliyor.
 - **İlk açılışta tarama tablosu ~7 dakika kurulur.** O bitene kadar
   `hisse_tarama` "tablo henüz kurulmadı" der; diğer 15 araç hemen çalışır.
 - Döviz/altın EVDS değil **yfinance** kullanır, yani anahtarsız çalışır.
