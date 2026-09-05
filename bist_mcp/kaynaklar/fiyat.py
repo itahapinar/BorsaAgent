@@ -15,6 +15,7 @@ import datetime as dt
 
 import yfinance as yf
 
+from bist_mcp.hiz_sinir import HizSinirlayici
 from bist_mcp.onbellek import Onbellek
 
 IZINLI_INFO_ALANLARI = frozenset(
@@ -28,6 +29,12 @@ ANLIK_TTL = 60
 GECMIS_TTL = 3600
 BILGI_TTL = 7 * 24 * 3600
 HACIM_PENCERESI = 60  # likidite icin son 60 islem gunu
+
+# Yahoo TEKIL uc noktalari (Ticker.history, Ticker.info) hizli ard arda
+# cagrilinca YFRateLimitError veriyor. Olculdu: 630 hisselik tam kurulum
+# sinirlayicisiz kosunca hem history hem info kilitlendi, yalnizca toplu
+# download ayakta kaldi. Toplu indirmenin sinira ihtiyaci yok - o tek istek.
+TEKIL_ISTEK_ARALIGI_SN = 0.6
 
 
 def bist_sembol(kod: str) -> str:
@@ -58,6 +65,8 @@ def ortalama_hacim_tl(hacimler, kapanislar, gun: int = HACIM_PENCERESI) -> float
 class FiyatKaynak:
     def __init__(self, onbellek: Onbellek) -> None:
         self._onbellek = onbellek
+        # Tekil cagrilar icin; toplu download bunu kullanmaz.
+        self._sinirlayici = HizSinirlayici(TEKIL_ISTEK_ARALIGI_SN)
 
     async def anlik(self, kod: str) -> dict:
         anahtar = f"fiyat:anlik:{kod.upper()}"
@@ -87,6 +96,7 @@ class FiyatKaynak:
                 "para_birimi": "TRY",
             }
 
+        await self._sinirlayici.bekle()
         sonuc = await asyncio.to_thread(_cek)
         self._onbellek.yaz(anahtar, sonuc, ANLIK_TTL)
         return sonuc
@@ -118,6 +128,7 @@ class FiyatKaynak:
                 for idx, s in veri.iterrows()
             ]
 
+        await self._sinirlayici.bekle()
         sonuc = await asyncio.to_thread(_cek)
         self._onbellek.yaz(anahtar, sonuc, GECMIS_TTL)
         return sonuc
@@ -129,6 +140,7 @@ class FiyatKaynak:
         if onbellekli is not None:
             return onbellekli
 
+        await self._sinirlayici.bekle()
         sonuc = info_suz(await asyncio.to_thread(lambda: yf.Ticker(bist_sembol(kod)).info))
         self._onbellek.yaz(anahtar, sonuc, BILGI_TTL)
         return sonuc
