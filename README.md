@@ -19,7 +19,7 @@ Copy-Item .env.example .env    # EVDS_API_KEY isteğe bağlı
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
-python -m pytest bist_mcp/              # 82 hızlı test, ağ yok
+python -m pytest bist_mcp/              # 90 hızlı test, ağ yok
 python -m pytest bist_mcp/ -m network   # 11 canlı test, ~10 sn
 ```
 
@@ -131,6 +131,22 @@ hacmi) bunun için var; `hisse_tarama` aracının `hacim_min` parametresiyle
 süzülür. Likidite ölçüsü olarak adet değil **TL** kullanılır: 1 TL'lik
 hisseden 100.000 adet ile 400 TL'lik hisseden 100.000 adet aynı likidite
 değildir.
+
+### Çok düşük F/K bir tuzaktır
+
+Tam evren kurulumunda ölçüldü: "F/K < 10" sorgusunun başını holdingler, GYO'lar
+ve yatırım ortaklıkları dolduruyor. Örnek — ISGSY'nin F/K'sı **0,21**; piyasa
+değeri 1,08 milyar TL iken net kârı 5,23 milyar TL görünüyor, çünkü bir girişim
+sermayesi ortaklığı ve "kâr"ı portföy yeniden değerleme kazancı, nakit kâr
+değil. Hesap doğru, yorum yanıltıcı.
+
+Bu satırlar gizlenmiyor (veri gerçek), ama `hisse_tarama` aracının açıklaması
+modeli uyarıyor: F/K'sı 2'nin altındaki şirketi ucuz diye sunma, ne iş
+yaptığına bak ve rakamın neden düşük olduğunu açıkla. İşletme kârlılığı aranan
+taramalarda `fk_min=3` gibi bir alt sınır daha anlamlı sonuç verir.
+
+KAP'ın `financialType` alanıyla şirket tipini eleyemiyoruz: 807 ticker'ın
+315'inde boş ve ISGSY de o boşlardan biri.
 
 ## Bilinen eksikler
 

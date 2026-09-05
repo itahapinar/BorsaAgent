@@ -391,6 +391,16 @@ async def hisse_tarama(
     alinip satilamaz. Kullanici likidite belirtmediyse 10000000 (10 milyon TL)
     gibi bir taban kullan ve bunu cevabinda soyle.
 
+    CEVAP YAZARKEN DIKKAT — cok dusuk F/K genellikle ucuzluk degil muhasebe
+    etkisidir. Olculen ornek: ISGSY'nin F/K'si 0,21; piyasa degeri 1,08 milyar
+    TL iken net kari 5,23 milyar TL gorunuyor, cunku bir girisim sermayesi
+    ortakligi ve "kar"i portfoy yeniden degerleme kazanci — nakit kar degil.
+    Holdingler, GYO'lar ve yatirim ortakliklari bu yuzden listenin basina
+    cikar. F/K'si 2'nin altinda bir sirketi ucuz diye sunma; sirketin ne is
+    yaptigina bak (gerekirse sirket_profili cagir) ve rakamin neden dusuk
+    oldugunu acikla. Isletme karliligi aranan taramalarda fk_min=3 gibi bir
+    alt sinir vermek daha anlamli sonuc verir.
+
     temettu_verimi_min yuzde olarak verilir (ornek: 5 = %5).
     sirala: fk, pddd, temettu_verimi, ortalama_hacim_tl veya piyasa_degeri.
     """
