@@ -22,7 +22,7 @@ from bist_mcp.anlik_gorunum import (
     AnlikGorunum,
     satir_hesapla,
 )
-from bist_mcp.bist100 import BIST100
+from bist_mcp.evren import tarama_evreni
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
 from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, kalem_bul, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
@@ -56,12 +56,13 @@ async def gorunum_bakim() -> None:
     """
     while True:
         try:
+            evren = await tarama_evreni(kap)
             yas = gorunum.yas_saat()
             if yas is None or yas > HAFTALIK_SAAT:
-                kayit.info("Anlik gorunum tam kuruluyor (~75 sn)")
-                kayit.info("Tam kurulum bitti: %d hisse", await gorunum.tam_kurulum(BIST100))
+                kayit.info("Anlik gorunum tam kuruluyor (~8 dk, %d ticker)", len(evren))
+                kayit.info("Tam kurulum bitti: %d hisse", await gorunum.tam_kurulum(evren))
             else:
-                kayit.info("Hafif tazeleme bitti: %d hisse", await gorunum.hafif_tazele(BIST100))
+                kayit.info("Hafif tazeleme bitti: %d hisse", await gorunum.hafif_tazele(evren))
         except Exception:
             kayit.exception("Gorunum tazelemesi basarisiz; bir sonraki turda tekrar denenecek")
 
@@ -340,7 +341,7 @@ async def hisse_karsilastir(kodlar: list[str]) -> list[dict]:
 async def sektor_karsilastirma(kod: str) -> dict:
     """Hissenin kendi sektorundeki konumu: sektor ortalamasi ve akran sayisi.
 
-    BIST-100 gorunumune dayanir; kapsam disi hisselerde akran bulunamayabilir.
+    Tarama tablosuna dayanir (BIST geneli, islem goren hisseler).
     """
     bilgi = await fiyat.sirket_bilgi(kod)
     sektor = bilgi.get("sector")
@@ -352,8 +353,8 @@ async def sektor_karsilastirma(kod: str) -> dict:
         return {
             "kod": kod.upper(),
             "sektor": sektor,
-            "hata": "Sektor tablosu henuz kurulmadi ya da bu sektorde BIST-100 "
-            "hissesi yok. Tekil oranlar icin finansal_oranlar kullan.",
+            "hata": "Sektor tablosu henuz kurulmadi ya da bu sektorde baska "
+            "hisse yok. Tekil oranlar icin finansal_oranlar kullan.",
         }
 
     fkler = [a["fk"] for a in akranlar if a["fk"]]
@@ -364,7 +365,7 @@ async def sektor_karsilastirma(kod: str) -> dict:
         "sektordeki_sirket_sayisi": len(akranlar),
         "sektor_ortalama_fk": round(sum(fkler) / len(fkler), 2) if fkler else None,
         "sektor_ortalama_pddd": round(sum(pdddler) / len(pdddler), 2) if pdddler else None,
-        "kapsam": "BIST-100",
+        "kapsam": "BIST geneli",
     }
 
 
@@ -375,15 +376,23 @@ async def hisse_tarama(
     pddd_max: float | None = None,
     temettu_verimi_min: float | None = None,
     piyasa_degeri_min: float | None = None,
+    hacim_min: float | None = None,
     sektor: str | None = None,
     sirala: str = "piyasa_degeri",
     adet: int = 20,
 ) -> dict:
     """Verilen kriterlere uyan hisseleri listeler. Kriterler VE ile birlesir.
 
-    ONEMLI: Sonuclar BIST-100 ile SINIRLIDIR; cevapta bunu mutlaka belirt.
+    Kapsam BIST'in tamami (~630 islem goren hisse), sadece BIST-100 degil.
+
+    `hacim_min` gunluk ortalama TL islem hacmi alt siniridir ve OLU HISSELERI
+    ELEMEK ICIN ONEMLIDIR: evrende gunde birkac lot islem goren kabuk
+    sirketler var, bunlar "F/K'si dusuk" diye listenin basina cikar ama
+    alinip satilamaz. Kullanici likidite belirtmediyse 10000000 (10 milyon TL)
+    gibi bir taban kullan ve bunu cevabinda soyle.
+
     temettu_verimi_min yuzde olarak verilir (ornek: 5 = %5).
-    sirala: fk, pddd, temettu_verimi veya piyasa_degeri.
+    sirala: fk, pddd, temettu_verimi, ortalama_hacim_tl veya piyasa_degeri.
     """
     satirlar = gorunum.satirlari_sec(
         fk_max=fk_max,
@@ -391,6 +400,7 @@ async def hisse_tarama(
         pddd_max=pddd_max,
         temettu_verimi_min=temettu_verimi_min,
         piyasa_degeri_min=piyasa_degeri_min,
+        hacim_min=hacim_min,
         sektor=sektor,
         sirala=sirala,
         adet=adet,
@@ -399,10 +409,12 @@ async def hisse_tarama(
     if yas is None:
         return {
             "hata": "Tarama tablosu henuz kurulmadi. Sunucu acilisinda arka planda "
-            "kuruluyor, yaklasik bir dakika surer. Biraz sonra tekrar dene."
+            "kuruluyor, yaklasik 8 dakika surer. Biraz sonra tekrar dene. "
+            "Tekil sorular (fiyat, oran, KAP) simdi de calisiyor."
         }
     return {
-        "kapsam": "BIST-100",
+        "kapsam": "BIST geneli (islem goren tum hisseler)",
+        "hacim_filtresi_tl": hacim_min,
         "veri_yasi_saat": round(yas, 1),
         "sonuc_sayisi": len(satirlar),
         "hisseler": satirlar,

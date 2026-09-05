@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 import httpx
 
+from bist_mcp.hiz_sinir import HizSinirlayici
 from bist_mcp.onbellek import Onbellek
 
 # KAP financialType kodlari: banka, sigorta, finansal kiralama/faktoring,
@@ -90,16 +91,12 @@ class KapIstemci:
     def __init__(self, onbellek: Onbellek) -> None:
         self._onbellek = onbellek
         self._kilit = asyncio.Lock()
-        self._son_istek = 0.0
+        self._sinirlayici = HizSinirlayici(ISTEK_ARALIGI_SN)
         self._oturum_isitildi = False
 
     async def _bekle(self) -> None:
-        """2 istek/sn tavanini uygular."""
-        simdi = asyncio.get_event_loop().time()
-        gecen = simdi - self._son_istek
-        if gecen < ISTEK_ARALIGI_SN:
-            await asyncio.sleep(ISTEK_ARALIGI_SN - gecen)
-        self._son_istek = asyncio.get_event_loop().time()
+        """2 istek/sn tavanini uygular (es zamanlilik-guvenli)."""
+        await self._sinirlayici.bekle()
 
     async def _oturum(self, istemci: httpx.AsyncClient) -> None:
         """API cagrisindan once cerez alir; yoksa WAF baglantiyi dusuruyor."""

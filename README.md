@@ -88,7 +88,15 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    bilançonun sonu, `İşletme Faaliyetlerinden Kaynaklanan Net Nakit` nakit
    akışının başı. **Bankalarda nakit akış tablosu yoktur.**
 
-7. **Tarama BIST-100 ile sınırlıdır** ve çıktı bunu belirtir.
+7. **Hız sınırlayıcı kilitli olmalı.** Kilitsiz sürüm eşzamanlılıkta hiç
+   sınırlamıyordu: ölçüldü, 20 eşzamanlı istek 2 istek/sn yerine 0,50 sn'de
+   ateşliyordu. 630 hisselik kurulumda bu, kaynak siteye yüzlerce eşzamanlı
+   istek demekti. `hiz_sinir.HizSinirlayici` bekleme ve damgayı atomik yapar.
+
+8. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
+   807 ticker veriyor, 630'unda fiyat verisi var; kalanı işlem görmeyen ya da
+   GARAN'ın `TGB`'si gibi ikincil kodlar ve toplu indirmede kendiliğinden
+   düşüyor.
 
 ## Hız sınırları
 
@@ -101,16 +109,28 @@ KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce
 
 ## Tarama tablosu (arka plan)
 
-`hisse_tarama` ve `sektor_karsilastirma` tüm BIST-100'ün verisine ihtiyaç
-duyar; her soruda 100 şirketi çekmek hız sınırını aşar. Bu yüzden sunucu
-içinde arka plan görevi tabloyu iki kademede taze tutar:
+`hisse_tarama` ve `sektor_karsilastirma` tüm evrenin verisine ihtiyaç duyar;
+her soruda 630 şirketi çekmek imkânsız. Bu yüzden sunucu içinde arka plan
+görevi tabloyu iki kademede taze tutar:
 
 | Kademe | Süre | İstek | Ne çeker |
 |---|---|---|---|
-| Günlük | ~5 sn | 2 | Fiyat + son 12 ay temettü (toplu indirme) |
-| Haftalık | ~75 sn | ~200 | Üstüne İş Yatırım finansalları + hisse adedi/sektör |
+| Günlük | ~40 sn | 1 | Fiyat + temettü + hacim (tek toplu indirme) |
+| Haftalık | ~7 dk | ~700 | Üstüne İş Yatırım finansalları + hisse adedi/sektör |
 
-Ölçüldü: 5 hisselik tam kurulum 3,7 sn → 100 hisse ~74 sn.
+Bu bedel arka planda ödenir. Soru sorduğunda tablo zaten hazırdır ve
+`hisse_tarama` doğrudan SQLite'a `SELECT` atar — gün içinde kaç kez sorarsan
+sor, hiçbir şey yeniden çekilmez.
+
+### Likidite filtresi
+
+Evren BIST'in tamamı olduğu için içinde günde birkaç lot işlem gören kabuk
+şirketler var. Bunlar "F/K'sı düşük" diye listenin başına çıkar ama alınıp
+satılamaz. `ortalama_hacim_tl` sütunu (son 60 işlem gününün ortalama TL işlem
+hacmi) bunun için var; `hisse_tarama` aracının `hacim_min` parametresiyle
+süzülür. Likidite ölçüsü olarak adet değil **TL** kullanılır: 1 TL'lik
+hisseden 100.000 adet ile 400 TL'lik hisseden 100.000 adet aynı likidite
+değildir.
 
 ## Bilinen eksikler
 
@@ -119,8 +139,8 @@ içinde arka plan görevi tabloyu iki kademede taze tutar:
   [evds2.tcmb.gov.tr](https://evds2.tcmb.gov.tr) üzerinden ücretsiz alınır.
   **EVDS seri kodları canlı doğrulanmadı** (anahtar olmadığı için istek
   atılamadı); yanlış kod boş kayıt döndürür, sessizce yanlış sayı döndürmez.
-- **`bist100.py` listesi son endeks revizyonuna göre doğrulanmadı.** Yanlış
-  kod yalnızca o hisseyi taramadan düşürür.
+- **İlk açılışta tarama tablosu ~7 dakika kurulur.** O bitene kadar
+  `hisse_tarama` "tablo henüz kurulmadı" der; diğer 15 araç hemen çalışır.
 - Döviz/altın EVDS değil **yfinance** kullanır, yani anahtarsız çalışır.
   Gram altın ons fiyatı × USD/TRY ÷ 31,1035 ile hesaplanır; dayanak değerler
   cevapta yer alır.

@@ -29,8 +29,13 @@ SUTUNLAR = (
     "fk",
     "piyasa_degeri",
     "temettu_verimi",
+    "ortalama_hacim_tl",
     "guncelleme",
 )
+
+# 630 hisselik tam kurulumda tum gorevleri ayni anda baslatmak, hiz
+# sinirlayiciyi kuyruga sokmasa bile yuzlerce acik baglanti demek.
+ES_ZAMANLI_TAVAN = 8
 
 # Sanayi ve banka (BDDK) tablolarinda ayni kavramin farkli adlari.
 OZKAYNAK_ADLARI = ("XVI. ÖZKAYNAKLAR", "Özkaynaklar")
@@ -41,7 +46,9 @@ NET_KAR_ADLARI = (
 )
 
 
-def satir_hesapla(temel: dict, fiyat: float, temettu_12ay: float) -> dict:
+def satir_hesapla(
+    temel: dict, fiyat: float, temettu_12ay: float, ortalama_hacim_tl: float | None = None
+) -> dict:
     """Temel veriden turetilmis oranlari hesaplar.
 
     Eksik ozkaynak/net kar oranlari None yapar ama satiri dusurmez —
@@ -64,6 +71,11 @@ def satir_hesapla(temel: dict, fiyat: float, temettu_12ay: float) -> dict:
         "fk": fk(fiyat, hisse_adedi, net_kar) if net_kar and hisse_adedi else None,
         "piyasa_degeri": piyasa_degeri(fiyat, hisse_adedi) if hisse_adedi else None,
         "temettu_verimi": temettu_verimi(temettu_12ay, fiyat) if fiyat else None,
+        "ortalama_hacim_tl": (
+            ortalama_hacim_tl
+            if ortalama_hacim_tl is not None
+            else temel.get("ortalama_hacim_tl")
+        ),
         "guncelleme": time.time(),
     }
 
@@ -80,7 +92,8 @@ class AnlikGorunum:
             "  kod TEXT PRIMARY KEY, unvan TEXT, sektor TEXT,"
             "  hisse_adedi INTEGER, ozkaynak_tl REAL, net_kar_tl REAL,"
             "  fiyat REAL, temettu_12ay REAL, pddd REAL, fk REAL,"
-            "  piyasa_degeri REAL, temettu_verimi REAL, guncelleme REAL"
+            "  piyasa_degeri REAL, temettu_verimi REAL,"
+            "  ortalama_hacim_tl REAL, guncelleme REAL"
             ")"
         )
         self._baglanti.commit()
@@ -108,6 +121,7 @@ class AnlikGorunum:
         pddd_max: float | None = None,
         temettu_verimi_min: float | None = None,
         piyasa_degeri_min: float | None = None,
+        hacim_min: float | None = None,
         sektor: str | None = None,
         sirala: str = "piyasa_degeri",
         adet: int = 20,
@@ -121,6 +135,7 @@ class AnlikGorunum:
             ("pddd", "<=", pddd_max),
             ("temettu_verimi", ">=", temettu_verimi_min),
             ("piyasa_degeri", ">=", piyasa_degeri_min),
+            ("ortalama_hacim_tl", ">=", hacim_min),
         ):
             if deger is not None:
                 kosullar.append(f"({alan} IS NOT NULL AND {alan} {islec} ?)")
@@ -152,43 +167,56 @@ class AnlikGorunum:
             ).fetchone()
             if mevcut is None:
                 continue
-            self.satir_yaz(satir_hesapla(dict(mevcut), veri["fiyat"], veri["temettu_12ay"]))
+            self.satir_yaz(
+                satir_hesapla(
+                    dict(mevcut),
+                    veri["fiyat"],
+                    veri["temettu_12ay"],
+                    veri.get("ortalama_hacim_tl"),
+                )
+            )
             guncellenen += 1
         return guncellenen
 
     async def tam_kurulum(self, kodlar: list[str]) -> int:
-        """Haftalik — Is Yatirim + yfinance info. Olculen: ~75 sn."""
+        """Haftalik — Is Yatirim + yfinance info.
+
+        Yalnizca toplu indirmede fiyati gelen hisseler islenir: KAP dizini
+        807 ticker veriyor ama 630'unda fiyat var, kalani islem gormeyen ya
+        da ikincil kodlar. Onlara istek atmak bosuna yuk olurdu.
+        """
         dizin = await self._kap.sirket_dizini()
         toplu = await self._fiyat.toplu(kodlar)
+        tavan = asyncio.Semaphore(ES_ZAMANLI_TAVAN)
 
         async def _bir_hisse(kod: str) -> dict | None:
-            sirket = dizin.get(kod)
-            piyasa = toplu.get(kod)
-            if piyasa is None:
-                return None
+            async with tavan:
+                sirket = dizin.get(kod)
+                piyasa = toplu[kod]
 
-            tablo, bilgi = await asyncio.gather(
-                self._isyatirim.mali_tablo(kod, sirket.tip if sirket else None),
-                self._fiyat.sirket_bilgi(kod),
-            )
-            kalemler = tablo["kalemler"]
+                tablo, bilgi = await asyncio.gather(
+                    self._isyatirim.mali_tablo(kod, sirket.tip if sirket else None),
+                    self._fiyat.sirket_bilgi(kod),
+                )
+                kalemler = tablo["kalemler"]
 
-            return satir_hesapla(
-                {
-                    "kod": kod,
-                    "unvan": sirket.unvan if sirket else None,
-                    "sektor": bilgi.get("sector"),
-                    "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
-                    "ozkaynak_tl": kalem_bul(kalemler, *OZKAYNAK_ADLARI),
-                    "net_kar_tl": kalem_bul(kalemler, *NET_KAR_ADLARI),
-                },
-                piyasa["fiyat"],
-                piyasa["temettu_12ay"],
-            )
+                return satir_hesapla(
+                    {
+                        "kod": kod,
+                        "unvan": sirket.unvan if sirket else None,
+                        "sektor": bilgi.get("sector"),
+                        "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
+                        "ozkaynak_tl": kalem_bul(kalemler, *OZKAYNAK_ADLARI),
+                        "net_kar_tl": kalem_bul(kalemler, *NET_KAR_ADLARI),
+                    },
+                    piyasa["fiyat"],
+                    piyasa["temettu_12ay"],
+                    piyasa.get("ortalama_hacim_tl"),
+                )
 
         yazilan = 0
         sonuclar = await asyncio.gather(
-            *(_bir_hisse(k) for k in kodlar), return_exceptions=True
+            *(_bir_hisse(k) for k in toplu), return_exceptions=True
         )
         for satir in sonuclar:
             if isinstance(satir, dict):

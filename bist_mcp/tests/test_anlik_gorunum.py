@@ -79,3 +79,44 @@ def test_dolu_tabloda_yas_sifira_yakin(tmp_path):
     gorunum = _gorunum(tmp_path)
     gorunum.satir_yaz(satir_hesapla(TEMEL, 296.00, 0.0))
     assert gorunum.yas_saat() < 0.1
+
+
+# --- Likidite: olu hisseler taramaya sizmamali ---
+
+
+def test_hacim_alt_siniri_olu_hisseleri_eler(tmp_path):
+    """Evren BIST geneli oldugu icin gunde birkac lot islem goren kabuk
+    sirketler var; F/K'si dusuk diye listenin basina cikip alinamiyorlar.
+    """
+    gorunum = _gorunum(tmp_path)
+    gorunum.satir_yaz(satir_hesapla(TEMEL, 296.00, 0.0, ortalama_hacim_tl=16_000_000_000))
+    olu = dict(TEMEL, kod="OLUHS", net_kar_tl=1_000_000)  # cok dusuk F/K
+    gorunum.satir_yaz(satir_hesapla(olu, 1.00, 0.0, ortalama_hacim_tl=12_000))
+
+    hepsi = [s["kod"] for s in gorunum.satirlari_sec(fk_max=100000)]
+    assert "OLUHS" in hepsi, "filtresiz taramada olu hisse gorunmeli"
+
+    likit = [s["kod"] for s in gorunum.satirlari_sec(fk_max=100000, hacim_min=10_000_000)]
+    assert likit == ["THYAO"]
+
+
+def test_hacmi_bilinmeyen_hisse_hacim_filtresine_takilmaz(tmp_path):
+    gorunum = _gorunum(tmp_path)
+    gorunum.satir_yaz(satir_hesapla(TEMEL, 296.00, 0.0, ortalama_hacim_tl=None))
+    assert gorunum.satirlari_sec(hacim_min=1_000) == []
+
+
+def test_hacim_sutunu_yaziliyor_ve_okunuyor(tmp_path):
+    gorunum = _gorunum(tmp_path)
+    gorunum.satir_yaz(satir_hesapla(TEMEL, 296.00, 0.0, ortalama_hacim_tl=16_054_600_000))
+    assert gorunum.satirlari_sec()[0]["ortalama_hacim_tl"] == 16_054_600_000
+
+
+def test_hacme_gore_siralanabilir(tmp_path):
+    gorunum = _gorunum(tmp_path)
+    gorunum.satir_yaz(satir_hesapla(TEMEL, 296.00, 0.0, ortalama_hacim_tl=1_000))
+    gorunum.satir_yaz(
+        satir_hesapla(dict(TEMEL, kod="LIKIT"), 100.0, 0.0, ortalama_hacim_tl=9_000_000)
+    )
+    sonuc = gorunum.satirlari_sec(sirala="ortalama_hacim_tl")
+    assert sonuc[0]["kod"] == "LIKIT"

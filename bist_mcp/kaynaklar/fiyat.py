@@ -27,6 +27,7 @@ YASAK_INFO_ALANLARI = frozenset(
 ANLIK_TTL = 60
 GECMIS_TTL = 3600
 BILGI_TTL = 7 * 24 * 3600
+HACIM_PENCERESI = 60  # likidite icin son 60 islem gunu
 
 
 def bist_sembol(kod: str) -> str:
@@ -37,6 +38,21 @@ def bist_sembol(kod: str) -> str:
 def info_suz(ham: dict) -> dict:
     """Yalnizca izinli alanlari birakir; turetilmis alanlar atilir."""
     return {k: v for k, v in ham.items() if k in IZINLI_INFO_ALANLARI}
+
+
+def ortalama_hacim_tl(hacimler, kapanislar, gun: int = HACIM_PENCERESI) -> float | None:
+    """Son `gun` islem gununun ortalama TL islem hacmi (adet x fiyat).
+
+    Likidite olcusu olarak adet degil TL kullanilir: 1 TL'lik hisseden
+    100.000 adet ile 400 TL'lik hisseden 100.000 adet ayni likidite degildir.
+    """
+    try:
+        cerceve = (hacimler * kapanislar).dropna().tail(gun)
+    except (TypeError, ValueError):
+        return None
+    if cerceve.empty:
+        return None
+    return round(float(cerceve.mean()), 2)
 
 
 class FiyatKaynak:
@@ -118,10 +134,15 @@ class FiyatKaynak:
         return sonuc
 
     async def toplu(self, kodlar: list[str]) -> dict[str, dict]:
-        """Cok hisseyi TEK istekte ceker: fiyat + son 12 ay temettusu.
+        """Cok hisseyi TEK istekte ceker: fiyat, son 12 ay temettusu, hacim.
 
-        Olculdu: 10 hisse / 1 yil / actions=True -> 0,79 sn. Temettu bu
-        cagriya dahil oldugu icin hisse basina ayri temettu istegi gerekmez.
+        Olculdu: 10 hisse 0,79 sn, 807 hisse 40 sn. Temettu ve hacim bu
+        cagriya dahil oldugu icin hisse basina ayri istek gerekmez.
+
+        `ortalama_hacim_tl` son 60 islem gununun ortalama TL islem hacmidir
+        (adet x fiyat). Likidite olcusu olarak adet degil TL kullanilir:
+        1 TL'lik hisseden 100.000 adet ile 400 TL'lik hisseden 100.000 adet
+        ayni likidite degildir. Taramada olu hisseleri elemek icin var.
         """
         semboller = [bist_sembol(k) for k in kodlar]
 
@@ -146,6 +167,9 @@ class FiyatKaynak:
                     sonuc[kod.strip().upper()] = {
                         "fiyat": round(float(kapanislar.iloc[-1]), 2),
                         "temettu_12ay": round(float(temettuler[temettuler > 0].sum()), 4),
+                        "ortalama_hacim_tl": ortalama_hacim_tl(
+                            cerceve[(sembol, "Volume")], cerceve[(sembol, "Close")]
+                        ),
                         "tarih": str(kapanislar.index[-1])[:10],
                     }
                 except (KeyError, IndexError):

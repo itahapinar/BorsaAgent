@@ -312,9 +312,7 @@ aşar ve engellenmeye yol açar.
 Görünüm SQLite'a yazılır; tarama ve sektör karşılaştırması bu yerel tabloyu
 okur, ağa çıkmaz.
 
-Kapsam: **BIST-100**. BIST-100 dışı bir hisse sorulursa tekil araçlar
-(`finansal_oranlar` vb.) yine çalışır; yalnızca tarama BIST-100 ile sınırlıdır
-ve çıktıda bu belirtilir.
+Kapsam: **BIST geneli** — işlem gören ~630 hisse (bkz. §7.4 kapsam kararı).
 
 ### 7.1 Tablo sütunları ve kaynakları
 
@@ -470,7 +468,7 @@ doğru aktarımı ölçülür.
 | 5 | `ASELS'in son KAP açıklamaları?` | 2026 tarihli gerçek bildirimler | §6.3 OID filtresi |
 | 6 | `THYAO 2 Ağustos'ta kaç TL'ydi?` | Kapalı gün ise en yakın işlem günü | Tarih mantığı |
 | 7 | Soru 4'ten sonra `peki özkaynağı?` | Tabloyu yeniden çekmeden cevap | Hafızada son tur |
-| 8 | `F/K'sı 10'un altında temettü veren hisseler` | Tablo + "BIST-100 ile sınırlı" notu | §7 toplu görünüm |
+| 8 | `F/K'sı 10'un altında temettü veren hisseler` | Tablo + likidite filtresi notu | §7 toplu görünüm |
 | 9 | Verisi olmayan bir hisse | "Veri bulunamadı" — uydurma yok | Boş veri işaretleme |
 | 10 | `/sifirla` | Sıfırlandı | Hafıza temizleme |
 
@@ -502,7 +500,6 @@ sabiti, `Restart=always`).
 - TEFAS fonları, kripto, ABD hisseleri
 - Çoklu kullanıcı, kota, kullanıcı bazlı hız sınırı
 - Fiyat alarmı, zamanlanmış bülten, portföy takibi
-- BIST-100 dışı hisseler için tarama (tekil araçlar çalışır, tarama çalışmaz)
 - KAP PDF eklerinin içeriği (bildirim özeti ve metni alınır, PDF ayrıştırılmaz)
 
 ## 13. Yapım sırası — iki aşama

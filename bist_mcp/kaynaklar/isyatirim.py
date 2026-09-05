@@ -16,6 +16,7 @@ import datetime as dt
 
 import httpx
 
+from bist_mcp.hiz_sinir import HizSinirlayici
 from bist_mcp.kaynaklar.kap import tablo_grubu_sec, yedek_grup
 from bist_mcp.onbellek import Onbellek
 
@@ -163,14 +164,10 @@ def kalem_bul(kalemler: list[dict], *adaylar: str) -> float | None:
 class IsYatirimIstemci:
     def __init__(self, onbellek: Onbellek) -> None:
         self._onbellek = onbellek
-        self._son_istek = 0.0
+        self._sinirlayici = HizSinirlayici(ISTEK_ARALIGI_SN)
 
     async def _bekle(self) -> None:
-        simdi = asyncio.get_event_loop().time()
-        gecen = simdi - self._son_istek
-        if gecen < ISTEK_ARALIGI_SN:
-            await asyncio.sleep(ISTEK_ARALIGI_SN - gecen)
-        self._son_istek = asyncio.get_event_loop().time()
+        await self._sinirlayici.bekle()
 
     async def _getir(self, kod: str, grup: str, donemler: list[tuple[int, int]]) -> dict:
         parametreler = {
