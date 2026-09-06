@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 
 from bist_mcp.anlik_gorunum import AnlikGorunum, satir_hesapla
 from bist_mcp.evren import tarama_evreni
-from bist_mcp.hesap import oran_makul
+from bist_mcp.hesap import oran_makul, temettu_verimi
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
 from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, hisse_adedi_sec, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
@@ -293,6 +293,41 @@ async def finansal_oranlar(kod: str) -> dict:
     return satir
 
 
+def _virgullu(deger: float, basamak: int) -> str:
+    """Turkce ondalik ayirici. Tek bir degere ozel replace calismaz."""
+    return f"{deger:.{basamak}f}".replace(".", ",")
+
+
+def temettu_ozeti(son_12ay_tl: float | None, fiyat_tl: float | None) -> dict:
+    """Temettu alanlarini sessiz sifir birakmadan derler.
+
+    Iki olculmus sorun:
+      - Veri gelmediginde 0.0 donuyordu; "temettu odenmedi" ile "veri yok"
+        ayirt edilemiyordu.
+      - Temettu ODENMIS olmasina ragmen (GENKM 0,2053 TL, verim %1,84)
+        model cevaba "0,00 TL, dagitim yapilmamaktadir" yazdi. `not` alani
+        modelin uydugu tek mekanizma; uyari oraya konuyor.
+    """
+    if son_12ay_tl is None:
+        return {
+            "son_12ay_toplam_tl": None,
+            "temettu_verimi": None,
+            "not": "Temettu verisi alinamadi; tutar BILINMIYOR. Sifir gibi sunma.",
+        }
+
+    verim = temettu_verimi(son_12ay_tl, fiyat_tl) if fiyat_tl else None
+    ozet: dict = {"son_12ay_toplam_tl": son_12ay_tl, "temettu_verimi": verim}
+
+    if son_12ay_tl > 0:
+        verim_yazi = f", verim %{_virgullu(verim, 2)}" if verim is not None else ""
+        ozet["not"] = (
+            f"Son 12 ayda hisse basina {_virgullu(son_12ay_tl, 4)} TL temettu "
+            f"ODENDI{verim_yazi}. Bu rakami aynen aktar; 'temettu odenmedi' "
+            "ya da '0,00' DEME."
+        )
+    return ozet
+
+
 @sunucu.tool()
 async def temettu_gecmisi(kod: str) -> dict:
     """Son bir yilda odenen temettuler ve KAP'taki temettu/sermaye artirimi
@@ -308,7 +343,10 @@ async def temettu_gecmisi(kod: str) -> dict:
     ]
     return {
         "kod": kod.upper(),
-        "son_12ay_toplam_tl": toplu.get(kod.strip().upper(), {}).get("temettu_12ay", 0.0),
+        **temettu_ozeti(
+            toplu.get(kod.strip().upper(), {}).get("temettu_12ay"),
+            toplu.get(kod.strip().upper(), {}).get("fiyat"),
+        ),
         "kap_bildirimleri": ilgili[:10],
     }
 

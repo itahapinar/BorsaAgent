@@ -65,6 +65,8 @@ def ortalama_hacim_tl(hacimler, kapanislar, gun: int = HACIM_PENCERESI) -> float
 class FiyatKaynak:
     def __init__(self, onbellek: Onbellek) -> None:
         self._onbellek = onbellek
+        # Ayni anda gelen ayni toplu istegi tek indirmede birlestirir.
+        self._ucus_halinde: dict[str, asyncio.Future] = {}
         # Tekil cagrilar icin; toplu download bunu kullanmaz.
         self._sinirlayici = HizSinirlayici(TEKIL_ISTEK_ARALIGI_SN)
 
@@ -145,17 +147,8 @@ class FiyatKaynak:
         self._onbellek.yaz(anahtar, sonuc, BILGI_TTL)
         return sonuc
 
-    async def toplu(self, kodlar: list[str]) -> dict[str, dict]:
-        """Cok hisseyi TEK istekte ceker: fiyat, son 12 ay temettusu, hacim.
-
-        Olculdu: 10 hisse 0,79 sn, 807 hisse 40 sn. Temettu ve hacim bu
-        cagriya dahil oldugu icin hisse basina ayri istek gerekmez.
-
-        `ortalama_hacim_tl` son 60 islem gununun ortalama TL islem hacmidir
-        (adet x fiyat). Likidite olcusu olarak adet degil TL kullanilir:
-        1 TL'lik hisseden 100.000 adet ile 400 TL'lik hisseden 100.000 adet
-        ayni likidite degildir. Taramada olu hisseleri elemek icin var.
-        """
+    async def _toplu_indir(self, kodlar: list[str]) -> dict[str, dict]:
+        """Tek yf.download cagrisi. Onbellek ve tekillestirme toplu()'da."""
         semboller = [bist_sembol(k) for k in kodlar]
 
         def _cek() -> dict[str, dict]:
@@ -189,3 +182,41 @@ class FiyatKaynak:
             return sonuc
 
         return await asyncio.to_thread(_cek)
+
+    async def toplu(self, kodlar: list[str]) -> dict[str, dict]:
+        """Cok hisseyi TEK istekte ceker: fiyat, son 12 ay temettusu, hacim.
+
+        Olculdu: 10 hisse 0,79 sn, 807 hisse 40 sn. Temettu ve hacim bu
+        cagriya dahil oldugu icin hisse basina ayri istek gerekmez.
+
+        `ortalama_hacim_tl` son 60 islem gununun ortalama TL islem hacmidir
+        (adet x fiyat). Likidite olcusu olarak adet degil TL kullanilir:
+        1 TL'lik hisseden 100.000 adet ile 400 TL'lik hisseden 100.000 adet
+        ayni likidite degildir. Taramada olu hisseleri elemek icin var.
+
+        Sonuc ANLIK_TTL boyunca onbelleklenir ve ayni anda gelen ayni istek
+        TEK indirmede birlesir. Olculdu: detayli_analiz icinde anlik_fiyat,
+        finansal_oranlar ve temettu_gecmisi ucu birden bu cagriyi yapiyor;
+        onbelleksiz surumde ayni indirme uc kez paralel gidiyordu ve biri
+        bos donunce temettu "odenmemis" gibi gorunuyordu.
+        """
+        anahtar = "fiyat:toplu:" + ",".join(sorted(k.strip().upper() for k in kodlar))
+
+        onbellekli = self._onbellek.al(anahtar)
+        if onbellekli is not None:
+            return onbellekli
+
+        ucus = self._ucus_halinde.get(anahtar)
+        if ucus is None:
+            ucus = asyncio.ensure_future(self._toplu_indir(kodlar))
+            self._ucus_halinde[anahtar] = ucus
+        try:
+            sonuc = await asyncio.shield(ucus)
+        finally:
+            self._ucus_halinde.pop(anahtar, None)
+
+        # Bos sonuc yazilmaz: gecici bir indirme hatasi ANLIK_TTL boyunca
+        # kalici "veri yok" haline gelirdi.
+        if sonuc:
+            self._onbellek.yaz(anahtar, sonuc, ANLIK_TTL)
+        return sonuc
