@@ -119,4 +119,4 @@ def test_temettu_tarihi_kurali_var():
 def test_ic_arac_adi_yazma_kurali_var():
     """Olculdu: model "Is Yatirim kaynagindan temettu_gecmisi fonksiyonu ile
     cekilmistir" dedi; odemeler yfinance'ten geliyor, atif yanlisti."""
-    assert "İç araç/fonksiyon adlarını" in sistem_promptu()
+    assert "İç araç adlarını" in sistem_promptu()
