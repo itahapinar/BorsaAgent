@@ -171,3 +171,90 @@ def test_gocte_mevcut_veri_korunur(tmp_path):
     ).fetchone()
     assert kayit["unvan"] == "THY"
     assert kayit["fiyat"] == 296.0
+
+
+# --- Kismi ilerleme --------------------------------------------------------
+# Olculdu: tam_kurulum butun hisseleri gather ile bekleyip satirlari ancak
+# hepsi bitince yaziyordu. Tarama ~7 dakika ve ~700 istek suruyor; surec o
+# bitmeden kapanirsa HICBIR ilerleme kaydedilmiyor ve sonraki acilis ayni
+# yuku bastan uretiyor. Bot gunlerce ayakta kalacagi icin her yeniden
+# baslatma bu bedeli odetirdi.
+
+import asyncio  # noqa: E402
+
+from bist_mcp.kaynaklar.kap import Sirket  # noqa: E402
+
+
+class SahteKap:
+    async def sirket_dizini(self):
+        return {
+            k: Sirket(kod=k, unvan=f"{k} A.S.", mkk_oid="o", tip=None, tum_kodlar=(k,))
+            for k in ("AAA", "BBB")
+        }
+
+
+class SahteFiyat:
+    async def toplu(self, kodlar):
+        return {
+            k: {"fiyat": 100.0, "temettu_12ay": 0.0, "ortalama_hacim_tl": 1e9}
+            for k in kodlar
+        }
+
+    async def sirket_bilgi(self, kod):
+        return {"sector": "Industrials", "sharesOutstanding": 1_000_000}
+
+
+class SahteIsYatirim:
+    """BBB'de takilir; AAA'nin satirinin yazilip yazilmadigini olcmek icin."""
+
+    def __init__(self):
+        self.engel = asyncio.Event()
+
+    async def oran_girdileri(self, kod, tip):
+        if kod == "BBB":
+            await self.engel.wait()
+        return {
+            "odenmis_sermaye": 1_000_000,
+            "ozkaynak_tl": 500_000_000.0,
+            "net_kar_ttm": 50_000_000.0,
+        }
+
+
+def _tarama_gorunumu(tmp_path):
+    isyatirim = SahteIsYatirim()
+    gorunum = AnlikGorunum(
+        tmp_path / "g.db", kap=SahteKap(), isyatirim=isyatirim, fiyat=SahteFiyat()
+    )
+    return gorunum, isyatirim
+
+
+async def _satir_sayisi(gorunum) -> int:
+    return gorunum._baglanti.execute("SELECT COUNT(*) FROM gorunum").fetchone()[0]
+
+
+async def test_yarida_kesilen_tarama_tamamlanan_satirlari_korur(tmp_path):
+    gorunum, isyatirim = _tarama_gorunumu(tmp_path)
+    gorev = asyncio.create_task(gorunum.tam_kurulum(["AAA", "BBB"]))
+
+    # AAA'nin yazilmasini bekle (kosul bazli, sabit uyku degil).
+    for _ in range(200):
+        if await _satir_sayisi(gorunum):
+            break
+        await asyncio.sleep(0.01)
+
+    gorev.cancel()
+    isyatirim.engel.set()
+    try:
+        await gorev
+    except asyncio.CancelledError:
+        pass
+
+    assert await _satir_sayisi(gorunum) == 1, "tamamlanan satir diske yazilmadi"
+
+
+async def test_tarama_bitince_tum_satirlar_yazilir(tmp_path):
+    gorunum, isyatirim = _tarama_gorunumu(tmp_path)
+    isyatirim.engel.set()
+    yazilan = await gorunum.tam_kurulum(["AAA", "BBB"])
+    assert yazilan == 2
+    assert await _satir_sayisi(gorunum) == 2

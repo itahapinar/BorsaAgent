@@ -203,8 +203,10 @@ class AnlikGorunum:
         dizin = await self._kap.sirket_dizini()
         toplu = await self._fiyat.toplu(kodlar)
         tavan = asyncio.Semaphore(ES_ZAMANLI_TAVAN)
+        yazilan = 0
 
-        async def _bir_hisse(kod: str) -> dict | None:
+        async def _bir_hisse(kod: str) -> None:
+            nonlocal yazilan
             async with tavan:
                 sirket = dizin.get(kod)
                 piyasa = toplu[kod]
@@ -214,7 +216,7 @@ class AnlikGorunum:
                     self._fiyat.sirket_bilgi(kod),
                 )
 
-                return satir_hesapla(
+                satir = satir_hesapla(
                     {
                         "kod": kod,
                         "unvan": sirket.unvan if sirket else None,
@@ -232,12 +234,11 @@ class AnlikGorunum:
                     piyasa.get("ortalama_hacim_tl"),
                 )
 
-        yazilan = 0
-        sonuclar = await asyncio.gather(
-            *(_bir_hisse(k) for k in toplu), return_exceptions=True
-        )
-        for satir in sonuclar:
-            if isinstance(satir, dict):
-                self.satir_yaz(satir)
-                yazilan += 1
+            # Satir HEMEN yazilir, gather'in sonu beklenmez: tarama ~7 dakika
+            # ve ~700 istek suruyor, surec o bitmeden kapanirsa tum ilerleme
+            # kaybolur ve sonraki acilis ayni yuku bastan uretir.
+            self.satir_yaz(satir)
+            yazilan += 1
+
+        await asyncio.gather(*(_bir_hisse(k) for k in toplu), return_exceptions=True)
         return yazilan
