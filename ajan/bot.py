@@ -14,12 +14,14 @@ import sys
 from pathlib import Path
 
 from aiogram import Bot, Dispatcher, F
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.types import Message
 from dotenv import load_dotenv
 
 from ajan.ajan import Ajan
-from ajan.bicim import mesaji_bol
+from ajan.bicim import mesaji_bol, telegram_html
 from ajan.config import ayarlari_yukle, log_kur
 from ajan.hafiza import Hafiza
 from ajan.mcp_baglanti import McpBaglanti
@@ -51,6 +53,10 @@ def yetkili_mi(gonderen: int | None, admin_id: int) -> bool:
 async def mesaji_isle(ajan, metin: str) -> list[str]:
     """Soruyu ajana verir, cevabi Telegram parcalarina boler.
 
+    Cevap Telegram HTML'ine cevrilir: model markdown uretiyor, Telegram boru
+    tablosunu render etmiyor ve parse_mode olmadan ** yildizlari metinde
+    gorunuyor (canli botta olculdu).
+
     Ham istisna kullaniciya gosterilmez: mesajinda API anahtari gibi sirlar
     bulunabilir. Log'a tam hali yazilir.
     """
@@ -59,7 +65,7 @@ async def mesaji_isle(ajan, metin: str) -> list[str]:
     except Exception:
         kayit.exception("Ajan cevap uretemedi")
         return [HATA_MESAJI]
-    return mesaji_bol(cevap)
+    return mesaji_bol(telegram_html(cevap))
 
 
 async def main() -> None:
@@ -81,7 +87,10 @@ async def main() -> None:
     hafiza = Hafiza(KOK / "sohbet.db")
     ajan = Ajan(ayarlar, mcp, hafiza)
 
-    bot = Bot(token=ayarlar.telegram_token)
+    bot = Bot(
+        token=ayarlar.telegram_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
     yonlendirici = Dispatcher()
     kilit = asyncio.Lock()  # arka arkaya mesajlar kuyruga girsin
 

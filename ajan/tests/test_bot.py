@@ -59,3 +59,12 @@ async def test_ajan_hatasi_kullaniciya_ham_gosterilmez():
     assert len(parcalar) == 1
     assert "nvapi" not in parcalar[0]
     assert "hata" in parcalar[0].lower()
+
+
+async def test_cevap_telegram_htmline_cevrilir():
+    """Canli botta olculdu: markdown ham dusuyordu, tablo okunmuyordu."""
+    ajan = SahteAjan("**THYAO**\n\n| Son fiyat | 296,00 TL |\n|---|---|\n| Hacim | 44,8 milyon TL |")
+    parca = (await mesaji_isle(ajan, "THYAO"))[0]
+    assert "<b>THYAO</b>" in parca
+    assert "<pre>" in parca
+    assert "|" not in parca and "**" not in parca

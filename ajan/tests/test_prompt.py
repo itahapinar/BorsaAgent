@@ -71,3 +71,11 @@ def test_kisaltma_acilimlari_veriliyor():
     metin = sistem_promptu()
     assert "Piyasa Değeri / Defter Değeri" in metin
     assert "Fiyat / Kazanç" in metin
+
+
+def test_binlik_ayirici_kurali_var():
+    """Olculdu: model "44 799 808" yazdi; bosluk ayirici hem yanlis biciM
+    hem de tabloda sayiyi bolunebilir hale getiriyor."""
+    metin = sistem_promptu()
+    assert "44.799.808" in metin
+    assert "boşluk" in metin.lower()

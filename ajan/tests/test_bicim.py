@@ -70,3 +70,139 @@ def test_tam_sinirda_cumleden_bolunur():
     parcalar = mesaji_bol(metin)
     assert all(len(p) <= 4096 for p in parcalar)
     assert all(p.endswith(".") for p in parcalar[:-1])
+
+
+# --- Telegram bicimlendirme -------------------------------------------------
+# Olculdu (canli bot): cevap ham markdown olarak dustu. Telegram boru
+# tablosunu HIC render etmiyor ve parse_mode ayarlanmadigi icin ** yildizlari
+# metnin icinde gorunuyordu. Modelden hizalama beklemek yerine tabloyu biz
+# hizaliyoruz: model markdown uretmekte iyi, sutun hizalamakta degil.
+
+from ajan.bicim import mesaji_bol, telegram_html  # noqa: E402
+
+TABLO = """| Öğe | Değer |
+|-----|-------|
+| Son fiyat | 296,00 TL |
+| Günlük hacim | 44,8 milyon TL |"""
+
+
+def test_markdown_tablosu_hizali_monospace_bloga_cevrilir():
+    sonuc = telegram_html(TABLO)
+    assert "<pre>" in sonuc and "</pre>" in sonuc
+    assert "|" not in sonuc, "boru isareti kalmamali"
+    govde = sonuc[sonuc.index("<pre>") + 5 : sonuc.index("</pre>")].strip("\n")
+    satirlar = govde.split("\n")
+    # Deger sutunu ayni sutunda baslamali
+    basi = [s.index("296,00") for s in satirlar if "296,00" in s]
+    basi += [s.index("44,8") for s in satirlar if "44,8" in s]
+    assert len(set(basi)) == 1, f"sutunlar hizali degil: {satirlar}"
+
+
+def test_tablo_hucrelerindeki_yildizlar_temizlenir():
+    sonuc = telegram_html("| Öğe | Değer |\n|---|---|\n| **Son fiyat** | **296,00 TL** |")
+    assert "*" not in sonuc
+
+
+def test_kalin_metin_html_etiketine_cevrilir():
+    assert telegram_html("**THYAO** analizi") == "<b>THYAO</b> analizi"
+
+
+def test_html_ozel_karakterleri_kacirilir():
+    """Kacirilmazsa Telegram 'can't parse entities' ile mesaji reddediyor."""
+    sonuc = telegram_html("5 < 10 & 3 > 1")
+    assert "&lt;" in sonuc and "&amp;" in sonuc and "&gt;" in sonuc
+    assert "<" not in sonuc.replace("&lt;", "").replace("&gt;", "")
+
+
+def test_tek_tirnakli_kod_etiketlenir():
+    assert telegram_html("`THYAO`") == "<code>THYAO</code>"
+
+
+def test_bolme_acik_pre_blogu_birakmaz():
+    """4096'yi asan bir tablo <pre> ortasindan bolunurse Telegram reddeder."""
+    satirlar = "\n".join(f"| Kalem {i} | {i} milyar TL |" for i in range(400))
+    metin = telegram_html("| Öğe | Değer |\n|---|---|\n" + satirlar)
+    parcalar = mesaji_bol(metin)
+
+    assert len(parcalar) > 1
+    for parca in parcalar:
+        assert len(parca) <= 4096
+        assert parca.count("<pre>") == parca.count("</pre>"), parca[:120]
+
+
+# --- Tablo genisligi --------------------------------------------------------
+# Olculdu (canli cikti): model "iki sutun kullan" kuralina uymayip 250
+# karakter genisliginde bir tablo uretti; telefonda okunmuyor. Modelin
+# uymasina guvenmek yerine genislik kodda sinirlaniyor.
+
+from ajan.bicim import AZAMI_TABLO_GENISLIGI, tablo_hizala  # noqa: E402
+
+GENIS = [
+    ["Oran", "Değer", "Açıklama"],
+    ["F/K (Fiyat/Kazanç)", "3,07", "296 TL fiyat bölü hisse başına kazanç, net kâr 133,05 milyar TL"],
+    ["PD/DD", "0,40", "Piyasa değeri 408,48 milyar TL bölü özkaynak 1,02 trilyon TL"],
+]
+
+
+def test_genis_tablo_sinira_daraltilir():
+    for satir in tablo_hizala(GENIS).split("\n"):
+        assert len(satir) <= AZAMI_TABLO_GENISLIGI, satir
+
+
+def test_daraltmada_veri_kaybolmaz():
+    """Satir kaydirilir, kirpilmaz: bir cevabin ortasindan veri dusmemeli."""
+    hizali = tablo_hizala(GENIS)
+    for satir in GENIS:
+        for hucre in satir:
+            for kelime in hucre.split():
+                assert kelime in hizali, kelime
+
+
+def test_dar_tablo_bozulmadan_kalir():
+    dar = [["Son fiyat", "296,00 TL"], ["Değişim", "+1,54 %"]]
+    assert tablo_hizala(dar) == "Son fiyat  296,00 TL\nDeğişim    +1,54 %"
+
+
+def test_yatay_cizgi_satirlari_atilir():
+    """Markdown '---' Telegram'da ham tire olarak gorunuyor, gurultu."""
+    assert "---" not in telegram_html("Bir\n\n---\n\nIki")
+
+
+def test_sayilar_ortadan_bolunmez():
+    """Olculdu: dar sutuna sikistirinca "408,48 milyar" -> "408,4" + "8 milyar".
+
+    Bir finans botunda sayinin ikiye ayrilmasi okuma hatasi dogurur.
+    """
+    hizali = tablo_hizala(GENIS)
+    for sayi in ("408,48", "133,05", "1,02", "3,07", "0,40"):
+        assert sayi in hizali, f"{sayi} bolunmus"
+
+
+def test_ucuncu_sutun_satirin_altina_girintili_yazilir():
+    hizali = tablo_hizala(GENIS).split("\n")
+    aciklamali = [s for s in hizali if s.startswith("  ") and "296 TL" in s]
+    assert aciklamali, f"ucuncu sutun girintili satira alinmadi: {hizali}"
+
+
+def test_bosluklu_binlik_ayirici_noktaya_cevrilir():
+    """Olculdu: model kurala ragmen "44 799 808" yaziyor. Turkce bicim nokta."""
+    assert "44.799.808" in telegram_html("Hacim 44 799 808 TL")
+    assert "1.018,52" in telegram_html("Özkaynak 1 018,52 milyar TL")
+
+
+def test_yil_gibi_ardisik_sayilar_birlestirilmez():
+    sonuc = telegram_html("2025 2024 karşılaştırması, 296 TL")
+    assert "2025 2024" in sonuc
+    assert "296 TL" in sonuc
+
+
+UC_SUTUN_VERI = [
+    ["Kalem", "2025", "2024"],
+    ["TOPLAM VARLIKLAR", "2,35 trilyon TL", "1,83 trilyon TL"],
+]
+
+
+def test_alta_inen_sutun_baslik_adiyla_etiketlenir():
+    """Ucuncu sutun veri olabilir; etiketsiz inince neyin nesi belli olmuyor."""
+    hizali = tablo_hizala(UC_SUTUN_VERI, baslikli=True)
+    assert "2024: 1,83 trilyon TL" in hizali
