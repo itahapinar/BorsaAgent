@@ -260,6 +260,18 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    birleşir ve **boş sonuç önbelleğe yazılmaz** — yoksa geçici bir hata
    60 saniye kalıcı "veri yok" olurdu.
 
+25. **Model cümle ortasında dil değiştiriyor; iki katmanda engellenir.**
+   Ölçüldü (canlı bot): "toparlama 가능성을 gösterirken", "destekㅕnu",
+   ayrıca ブランド (Japonca), نسبي (Arapça), 压力 (Çince). Prompt'taki
+   "cevabın tamamı TÜRKÇE olsun" kuralı tutmuyor. **Kaynakta:** LLM
+   çağrıları `temperature=0.3` ile gider — varsayılan sıcaklıkta
+   bırakılmıştı ve rastgele jeton seçimi başlıca sebep. **Çıktıda:**
+   Türkçe olmayan alfabeden harf içeren KELİME atılır; harfi tek başına
+   silmek "destek nu" gibi bozuk kelime bırakıyordu.
+
+26. **Telegram markdown başlığı render etmez.** `### 📰 KAP` ham metin
+   olarak düşüyordu; `bicim.py` bunları `<b>` yapar.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce
