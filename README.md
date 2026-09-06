@@ -19,7 +19,7 @@ Copy-Item .env.example .env    # sonra .env'i doldur — GERÇEK ANAHTARLAR .env
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
-python -m pytest bist_mcp/              # 109 hızlı test, ağ yok
+python -m pytest bist_mcp/              # 120 hızlı test, ağ yok
 python -m pytest bist_mcp/ -m network   # 11 canlı test, ~10 sn
 ```
 
@@ -107,36 +107,64 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    veri yok — `finansal_oranlar` bu durumu açıkça belirtiyor ki model "0" ya
    da "düşük" diye sunmasın.
 
-4. **İş Yatırım MaliTablo TAM 4 DÖNEM istiyor.** 2 ya da 3 dönemle istek
+4. **Oranlar ANA ORTAKLIK payı üzerinden hesaplanır.** Piyasa değeri yalnızca
+   ana ortaklığın hissedarlarını temsil eder; konsolide toplamın içinde bağlı
+   ortaklıkların başkalarına ait payları vardır.
+
+   Ölçüldü (AHGAZ) — gerçek PD/DD 1,72 / F/K 18,22: toplam özkaynak 93,24 mlr,
+   içinde **33,30 mlr azınlık payı**; ana ortaklık 59,94 mlr. Toplamla PD/DD
+   1,08 (yanlış). Çıkarım sırası: doğrudan ana ortaklık satırı → toplam eksi
+   azınlık → toplam.
+
+   **`Azınlık Payları` HEM bilançoda HEM gelir tablosunda geçiyor** (AHGAZ'da
+   33,3 mlr ve 1,5 mlr). Düz ad araması ikisini karıştırıp net kârı eksiye
+   düşürüyordu; arama bölüm bazlı yapılır.
+
+5. **Hisse adedi ödenmiş sermayeden alınır, yfinance'ten değil.** BIST'te
+   nominal 1 TL. yfinance geri alınmış payları düşüyor ve düşük kalıyor.
+
+   Tüm evren denetlendi, 28 hissede iki kaynak %10'dan fazla ayrışıyor. KAP'ın
+   kendi ödenmiş sermayesi üçüncü kaynak olarak soruldu: kontrol edilebilen
+   **6 vakanın 6'sında da İş Yatırım doğru** (FLAP'ta yfinance 625 kat
+   yanılıyor). İlk sürümdeki "çok saparsa yfinance'e dön" kontrolü tam da bu
+   vakalarda yanlışı seçiyordu — kaldırıldı.
+
+6. **Çoklu hisse sınıfında oran verilmez.** ISATR/ISBTR/ISCTR/ISKUR/TIB KAP'ta
+   **tek kayıt** (Türkiye İş Bankası), ödenmiş sermaye 10 mlr TL. Bu sermayenin
+   tamamını her sınıfa atayınca ISATR'da PD/DD 272.562 çıkıyordu. O sınıfa
+   düşen hisse adedi güvenilir belirlenemediği için `finansal_oranlar` sayı
+   yerine açık bir uyarı döndürüyor.
+
+7. **İş Yatırım MaliTablo TAM 4 DÖNEM istiyor.** 2 ya da 3 dönemle istek
    hata vermiyor, sessizce **boş liste** dönüyor. `_getir` eksik pencereyi
    otomatik dolduruyor ki hiçbir çağıran bu tuzağa düşmesin.
 
-5. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
+8. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
    **isim aramasıdır**: `member/filter/GARAN` sekiz sonuç döndürüyor ve ilki
    "GARANTİ BBVA OPERASYONEL KİRALAMA"; doğru banka sekizinci sırada.
 
-6. **`stockCode` virgüllü çoklu kod tutar** (`"GARAN, TGB"`). Bölünmeden
+9. **`stockCode` virgüllü çoklu kod tutar** (`"GARAN, TGB"`). Bölünmeden
    eşleştirilirse GARAN, YKBNK, VAKBN, HALKB, ISCTR kaybolur.
    757 şirket → **807 ticker**.
 
-7. **Dönem takvimle hesaplanamaz.** 2026-09-05'te `2026/12` ve `2026/9` boş
+10. **Dönem takvimle hesaplanamaz.** 2026-09-05'te `2026/12` ve `2026/9` boş
    döner (henüz yayımlanmadı). Aday dönemler istenir, tamamen boş slotlar
    atılır. Değerler satır bazında değil **slot bazında** hizalanır.
 
-8. **İş Yatırım değerleri STRING döner** (`'1073081134047'`). Çevrilmezse
+11. **İş Yatırım değerleri STRING döner** (`'1073081134047'`). Çevrilmezse
    oran hesabı bölemez ve `'0' != 0` olduğu için sıfır satırları atılmaz.
 
-9. **Bilanço/gelir/nakit tek listede gelir**, ayrı tablolar halinde değil.
+12. **Bilanço/gelir/nakit tek listede gelir**, ayrı tablolar halinde değil.
    Bölme işaretleri: `TOPLAM KAYNAKLAR` (sanayi) / `PASİF TOPLAMI` (banka)
    bilançonun sonu, `İşletme Faaliyetlerinden Kaynaklanan Net Nakit` nakit
    akışının başı. **Bankalarda nakit akış tablosu yoktur.**
 
-10. **Hız sınırlayıcı kilitli olmalı.** Kilitsiz sürüm eşzamanlılıkta hiç
+13. **Hız sınırlayıcı kilitli olmalı.** Kilitsiz sürüm eşzamanlılıkta hiç
    sınırlamıyordu: ölçüldü, 20 eşzamanlı istek 2 istek/sn yerine 0,50 sn'de
    ateşliyordu. 630 hisselik kurulumda bu, kaynak siteye yüzlerce eşzamanlı
    istek demekti. `hiz_sinir.HizSinirlayici` bekleme ve damgayı atomik yapar.
 
-11. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
+14. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
    807 ticker veriyor, 630'unda fiyat verisi var; kalanı işlem görmeyen ya da
    GARAN'ın `TGB`'si gibi ikincil kodlar ve toplu indirmede kendiliğinden
    düşüyor.
@@ -190,6 +218,18 @@ taramalarda `fk_min=3` gibi bir alt sınır daha anlamlı sonuç verir.
 
 KAP'ın `financialType` alanıyla şirket tipini eleyemiyoruz: 807 ticker'ın
 315'inde boş ve ISGSY de o boşlardan biri.
+
+## Tam evren denetimi (630 işlem gören hisse)
+
+| Durum | Sayı |
+|---|---|
+| Sağlıklı | **566** |
+| Kaynakta finansal tablo yok | 21 |
+| İki kaynak hisse adedinde ayrışıyor (İş Yatırım seçilir) | 28 |
+| Oran olağandışı — uyarı notuyla döner | 15 |
+
+Denetim betiği tekrar koşulabilir: her hissede çekim başarısı, ana ortaklık
+tutarlılığı, hisse adedi uyumu ve oran makullüğü kontrol edilir.
 
 ## Bilinen eksikler
 
