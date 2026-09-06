@@ -75,7 +75,7 @@ düşebiliyor ve sunucu "Server disconnected" ile anında ölüyor:
 
 ## Araçlar
 
-**Hisse (9):** `hisse_ara` · `anlik_fiyat` · `gecmis_fiyat` · `sirket_profili` ·
+**Hisse (10):** `detayli_analiz` · `hisse_ara` · `anlik_fiyat` · `gecmis_fiyat` · `sirket_profili` ·
 `finansal_tablo` · `finansal_oranlar` · `temettu_gecmisi` · `kap_bildirimleri` ·
 `kap_bildirim_detay`
 
@@ -231,6 +231,34 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    `2.351.336.385.167 TL` gibi ham rakam bastı, PD/DD'yi "Pi Değeri / Denge
    Değeri" diye açtı. İlk ikisi `bicim.py`'de düzeltilir, üçüncüsü için doğru
    açılım prompta yazılıdır.
+
+21. **Detaylı analiz TEK araçla toplanır.** Ölçüldü (GENKM): zinciri modele
+   bırakınca 3-4 araç sonra duruyor; RSI/MACD hiç gelmiyor ve gelir tablosu
+   çekilmediği için model **EBIT'i ve brüt marjı tahmin ediyordu** — gerçeğe
+   göre %79 ve ~2 kat sapmayla. `detayli_analiz` on bölümü tek çağrıda
+   toplar ve alınamayanları `eksik_bolumler` alanında açıkça sayar; eksiği
+   gizlemek uydurmaya yol açıyordu.
+
+22. **Başlık rakamları KODDA üretilir, modelden geçmez.** `detayli_analiz`
+   hazır bir `ozet_kart` tablosu döndürür, ajan onu cevabın başına olduğu
+   gibi ekler. Kural geneldir: `ajan/` aracın ne yaptığını bilmez, yalnızca
+   bu alan adını bilir. Gerekçe ölçüldü — model doğru değeri dört ayrı yerde
+   görmesine rağmen yanlış yazabiliyordu.
+
+23. **Sessiz sıfır yasak; "ödenmedi" ile "bilinmiyor" ayrı şeylerdir.**
+   `finansal_oranlar` ve `temettu_gecmisi` toplu indirme boş dönünce
+   `0.0` varsayıyordu ve cevap "temettü ödenmemiş" diyordu. Varsayılan
+   kaldırıldı. Canlı veri gelmezse **günlük görünüm tablosuna** düşülür
+   (temettü yıllık bir olay, bir günlük anlık görüntü yeterince tazedir) ve
+   kaynak cevapta belirtilir. Fiyat için bu yapılmaz: orada bir gün eski
+   veri yanıltır.
+
+24. **Aynı toplu indirme paralel tekrarlanmaz.** `detayli_analiz` içinde
+   `anlik_fiyat`, `finansal_oranlar` ve `temettu_gecmisi` üçü de
+   `fiyat.toplu` çağırıyordu; önbellek yoktu ve aynı indirme üç kez paralel
+   gidiyordu. Sonuç 60 sn önbelleklenir, eş zamanlı aynı istek tek indirmede
+   birleşir ve **boş sonuç önbelleğe yazılmaz** — yoksa geçici bir hata
+   60 saniye kalıcı "veri yok" olurdu.
 
 ## Hız sınırları
 
