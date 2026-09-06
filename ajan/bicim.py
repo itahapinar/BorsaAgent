@@ -159,6 +159,18 @@ def yabanci_yaziyi_temizle(metin: str) -> str:
     return re.sub(r"[^\S\n]{2,}", " ", temiz).replace(" \n", "\n")
 
 
+# Olculdu (DOAS): model ham JSON degerini kopyalayip "15.0", "27.2727"
+# yazdi. Turkce ondalik ayirici virguldur. Lookaround'lar tarihi ve binlik
+# ayiriciyi korur: 07.09.2026 ve 1.234.567 iki noktali olduklari icin
+# eslesmez.
+# Tam 3 haneli kesir binlik ayiricidir (44.799), ondalik degil.
+ONDALIK_NOKTA = re.compile(r"(?<![\d.])(\d+)\.(\d{1,2}|\d{4,})(?![\d.])")
+
+
+def _ondalik_virgule(metin: str) -> str:
+    return ONDALIK_NOKTA.sub(r"\1,\2", metin)
+
+
 def _kacir(metin: str) -> str:
     return metin.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -280,6 +292,7 @@ def telegram_html(metin: str) -> str:
     metin = yabanci_yaziyi_temizle(metin)
     metin = YATAY_CIZGI.sub("", metin)
     metin = _binlik_ayiriciyi_duzelt(metin)
+    metin = _ondalik_virgule(metin)
     metin = _ham_tutarlari_kisalt(metin)
     govde, tablolar = _tablolari_ayikla(metin)
     govde = _kacir(govde)

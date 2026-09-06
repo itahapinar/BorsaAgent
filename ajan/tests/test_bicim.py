@@ -301,3 +301,37 @@ def test_turkce_harfler_ve_emoji_korunur():
 
 def test_temizlik_bosluklari_bozmaz():
     assert telegram_html("bir 가능성 iki") == "bir iki"
+
+
+# --- Ondalik nokta ---------------------------------------------------------
+# Olculdu (DOAS): model ham JSON degerini kopyaladi ve tabloda "15.0",
+# "27.2727" yazdi. Turkce ondalik ayirici virguldur. Cevrim TARIHLERI
+# bozmamali: 07.09.2026 aynen kalmali.
+
+
+def test_ondalik_nokta_virgule_cevrilir():
+    assert "15,0" in telegram_html("Tutar 15.0 TL")
+    assert "27,2727" in telegram_html("Tutar 27.2727 TL")
+
+
+def test_tarihler_bozulmaz():
+    for tarih in ("07.09.2026", "13.08.2026", "1.1.2020"):
+        assert tarih in telegram_html(f"Ödeme tarihi {tarih} olarak açıklandı")
+
+
+def test_binlik_ayirici_bozulmaz():
+    """1.234.567 zaten kisaltiliyor; esik altindaki bir sayiyla olculur."""
+    assert "12.345" in telegram_html("Tutar 12.345 lot")
+    assert "1,23 milyon" in telegram_html("Tutar 1.234.567 lot"), "kisaltma calismali"
+
+
+def test_cumle_sonundaki_nokta_korunur():
+    sonuc = telegram_html("Fiyat arttı. Yeni seviye 15.0 TL.")
+    assert "arttı." in sonuc
+    assert "15,0 TL." in sonuc
+
+
+def test_uc_haneli_kesir_binlik_sayilir():
+    """44.799 binlik ayiricidir; 44,799 diye cevrilirse tutar 1000 kat sasar."""
+    assert "44.799" in telegram_html("Hacim 44.799 lot")
+    assert "44,799" not in telegram_html("Hacim 44.799 lot")
