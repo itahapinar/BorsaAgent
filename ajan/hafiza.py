@@ -95,9 +95,22 @@ class Hafiza:
             for s in self._baglanti.execute("SELECT * FROM mesaj ORDER BY id").fetchall()
         ]
 
+    def _son_arac_turu(self) -> int:
+        """Arac calistirilan EN SON tur.
+
+        MAX(tur) degil: yeni soru turu hemen artiriyor, o yuzden MAX(tur)
+        ile bakinca onceki turun arac verisi daha modele gitmeden dusuyordu
+        ve "son turun sonucu geri gonderilir" kurali pratikte hicbir sey
+        gondermiyordu. Takip sorusu ("peki ozkaynagi?") veriyi goremezdi.
+        """
+        satir = self._baglanti.execute(
+            "SELECT MAX(tur) AS t FROM mesaj WHERE arac_sonucu = 1"
+        ).fetchone()
+        return satir["t"] or 0
+
     def gecmis(self) -> list[dict]:
         """Modele gonderilecek mesaj listesi (eski -> yeni)."""
-        son_tur = self._son_tur()
+        son_tur = self._son_arac_turu()
         satirlar = self._baglanti.execute(
             "SELECT rol, icerik, arac_sonucu, tur, ek FROM mesaj ORDER BY id"
         ).fetchall()
