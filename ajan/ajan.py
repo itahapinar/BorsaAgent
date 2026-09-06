@@ -7,6 +7,7 @@ Araclar MCP'den gelir, bu modul onlarin ne yaptigini bilmez.
 import asyncio
 import json
 import logging
+import re
 
 from openai import AsyncOpenAI
 
@@ -33,6 +34,27 @@ TAVAN_MESAJI = (
 # tutmadi. Baslik rakamlari artik modelden gecmiyor. Kural GENEL: ajan
 # aracin ne yaptigini bilmez, yalnizca bu alan adini bilir.
 OZET_KART_ALANI = "ozet_kart"
+
+# Olculdu (DOAS): modelin ham arac cagrisi cevaba sizdi -- argumanlarin
+# JSON'u ve </tool_call etiketi cevabin basinda goründu. Araliklı bir
+# davranis (sonraki kosu temizdi), o yuzden ciktida temizlenir.
+ARAC_BLOGU = re.compile(r"<tool_call>.*?</tool_call>?", re.S)
+ARAC_ETIKETI = re.compile(r"</?tool_call>?")
+
+
+def cagri_kalintisini_temizle(metin: str) -> str:
+    """Modelin cevabina karisan arac cagrisi artiklarini atar."""
+    temiz = ARAC_BLOGU.sub("", metin)
+
+    # Acilis etiketi olmadan kapanis kaldiysa oncesindeki her sey arguman
+    # JSON'udur; satir sonuna kadar atilir.
+    kapanis = temiz.rfind("</tool_call")
+    if kapanis != -1:
+        satir_sonu = temiz.find("\n", kapanis)
+        temiz = temiz[satir_sonu + 1 :] if satir_sonu != -1 else ""
+
+    return ARAC_ETIKETI.sub("", temiz).strip()
+
 
 
 def kart_ayikla(sonuc_metni: str) -> str | None:
@@ -111,7 +133,7 @@ class Ajan:
             mesaj = yanit.choices[0].message
 
             if not getattr(mesaj, "tool_calls", None):
-                cevap = (mesaj.content or "").strip() or "Cevap uretemedim."
+                cevap = cagri_kalintisini_temizle(mesaj.content or "") or "Cevap uretemedim."
                 self._hafiza.ekle("assistant", cevap)
                 return self._kartla(kartlar, cevap)
 
@@ -141,7 +163,7 @@ class Ajan:
             messages=[*mesajlar, {"role": "user", "content": TAVAN_MESAJI}],
             temperature=SICAKLIK,
         )
-        cevap = (son.choices[0].message.content or "").strip() or (
+        cevap = cagri_kalintisini_temizle(son.choices[0].message.content or "") or (
             "Bu soru icin gereken veriyi toplayamadim."
         )
         self._hafiza.ekle("assistant", cevap)

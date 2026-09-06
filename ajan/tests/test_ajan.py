@@ -266,3 +266,40 @@ async def test_tur_tavani_cagrisi_da_dusuk_sicaklikli(tmp_path):
     llm = SahteLLM(sonsuz)
     await _ajan(tmp_path, llm).cevapla("dongu")
     assert llm.istekler[-1]["temperature"] == SICAKLIK
+
+
+# --- Arac cagrisi kalintisi ------------------------------------------------
+# Olculdu (DOAS): modelin ham arac cagrisi cevaba sizdi --
+# '{\n  "kod": "DOAS",\n  "yil": 5\n</tool_call' cevabin basinda goründu.
+# Araliklı: sonraki kosuda temizdi. Olabildigine gore temizleniyor.
+
+from ajan.ajan import cagri_kalintisini_temizle  # noqa: E402
+
+
+def test_normal_cevap_degismez():
+    assert cagri_kalintisini_temizle("THYAO 296,00 TL") == "THYAO 296,00 TL"
+
+
+def test_tam_arac_blogu_atilir():
+    ham = '<tool_call>{"kod": "DOAS"}</tool_call>\nDOAS temettüleri şöyle:'
+    assert cagri_kalintisini_temizle(ham) == "DOAS temettüleri şöyle:"
+
+
+def test_acilissiz_kapanista_onceki_json_da_atilir():
+    ham = '{\n  "kod": "DOAS",\n  "yil": 5\n</tool_call>\nDOAS – Temettü Ödemeleri'
+    assert cagri_kalintisini_temizle(ham) == "DOAS – Temettü Ödemeleri"
+
+
+def test_kapanis_isareti_eksik_olsa_da_temizlenir():
+    ham = '{"kod": "DOAS"\n</tool_call\nCevap metni'
+    assert cagri_kalintisini_temizle(ham) == "Cevap metni"
+
+
+def test_basibos_etiket_silinir():
+    assert cagri_kalintisini_temizle("Cevap <tool_call> devam") == "Cevap  devam"
+
+
+async def test_cevapta_kalinti_kalmaz(tmp_path):
+    kirli = '{"kod": "DOAS"\n</tool_call>\nDOAS temettü tablosu'
+    llm = SahteLLM([SahteYanit([SahteSecim(SahteMesaj(content=kirli))])])
+    assert await _ajan(tmp_path, llm).cevapla("DOAS") == "DOAS temettü tablosu"

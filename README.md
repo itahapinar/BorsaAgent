@@ -272,6 +272,18 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
 26. **Telegram markdown başlığı render etmez.** `### 📰 KAP` ham metin
    olarak düşüyordu; `bicim.py` bunları `<b>` yapar.
 
+27. **Temettü ÖDEME tarihi ile KAP DUYURU tarihi ayrıdır.** Ölçüldü (DOAS):
+   "temettü tarihleri" sorulduğunda araç yalnızca duyuru bildirimlerini
+   döndürüyordu ve hisse başına tutarı hiç vermiyordu. `temettu_gecmisi`
+   artık `odemeler` alanında gerçek ödemeleri veriyor — 13.08.2026 15,00 TL,
+   19.04.2024 40,9091 TL gibi. Tutarlar sonraki bölünme/bedelsiz işlemlerine
+   göre **düzeltilmiş** seriden gelir; `odeme_notu` bunu söyler, yoksa
+   KAP'taki brüt tutarla karşılaştırınca çelişik görünür.
+
+28. **Modelin ham araç çağrısı cevaba sızabiliyor.** Ölçüldü: bir koşuda
+   `{"kod": "DOAS", "yil": 5 </tool_call` cevabın başında göründü, sonraki
+   koşuda görünmedi — aralıklı. Çıktıda temizleniyor.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce
