@@ -22,6 +22,11 @@ BILDIRIM_SORGU_SAYFASI = f"{KAP_KOK}/tr/bildirim-sorgu"
 # Olculen WAF davranisi: 2 istek/sn ustunde TCP baglantisi ~6 sn'de dusuyor.
 ISTEK_ARALIGI_SN = 0.5
 
+# Olculen (2026-09-06): byCriteria 365 gunluk araligi kabul ediyor (THYAO 88,
+# MEKAG 98 kayit); 366 gun HTTP 500 donuyor. Daha uzun gecmis istendiginde
+# aralik parcalara bolunup birlestirilir.
+AZAMI_ARALIK_GUN = 365
+
 DIZIN_TTL = 7 * 24 * 3600  # sirket listesi haftada bir yeter
 BILDIRIM_TTL = 300  # 5 dk
 DETAY_TTL = 24 * 3600
@@ -96,6 +101,37 @@ def bildirim_sadelestir(ham: dict) -> dict:
     }
 
 
+def tarih_pencereleri(
+    baslangic: dt.date, bitis: dt.date, azami_gun: int = AZAMI_ARALIK_GUN
+) -> list[tuple[dt.date, dt.date]]:
+    """Araligi KAP'in kabul ettigi uzunlukta, ustuste binmeyen parcalara boler."""
+    pencereler: list[tuple[dt.date, dt.date]] = []
+    parca_bas = baslangic
+    while parca_bas <= bitis:
+        parca_bitis = min(parca_bas + dt.timedelta(days=azami_gun), bitis)
+        pencereler.append((parca_bas, parca_bitis))
+        parca_bas = parca_bitis + dt.timedelta(days=1)
+    return pencereler
+
+
+def _yayin_zamani(kayit: dict) -> dt.datetime:
+    ham = (kayit.get("publishDate") or "").strip()
+    for bicim in ("%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"):
+        try:
+            return dt.datetime.strptime(ham, bicim)
+        except ValueError:
+            continue
+    return dt.datetime.min
+
+
+def tekillestir(ham: list[dict]) -> list[dict]:
+    """Parcali sorgulardan gelen kayitlari birlestirir: tekil, yeniden eskiye."""
+    gorulen: dict[str, dict] = {}
+    for kayit in ham:
+        gorulen.setdefault(str(kayit.get("disclosureIndex")), kayit)
+    return sorted(gorulen.values(), key=_yayin_zamani, reverse=True)
+
+
 class KapIstemci:
     def __init__(self, onbellek: Onbellek) -> None:
         self._onbellek = onbellek
@@ -148,30 +184,46 @@ class KapIstemci:
         bitis = dt.date.today()
         baslangic = bitis - dt.timedelta(days=gun)
 
+        ham: list[dict] = []
         async with httpx.AsyncClient(follow_redirects=True) as istemci:
             await self._oturum(istemci)
-            await self._bekle()
-            yanit = await istemci.post(
-                f"{KAP_KOK}/tr/api/disclosure/members/byCriteria",
-                json={
-                    "fromDate": str(baslangic),
-                    "toDate": str(bitis),
-                    "mkkMemberOidList": [sirket.mkk_oid],
-                    "subjectList": [],
-                },
-                headers={
-                    "User-Agent": "Mozilla/5.0",
-                    "Referer": BILDIRIM_SORGU_SAYFASI,
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                timeout=45.0,
-            )
-            yanit.raise_for_status()
-            sonuc = [bildirim_sadelestir(x) for x in yanit.json()]
+            for parca_bas, parca_bitis in tarih_pencereleri(baslangic, bitis):
+                ham.extend(
+                    await self._ham_bildirimler(
+                        istemci, sirket.mkk_oid, parca_bas, parca_bitis
+                    )
+                )
 
+        sonuc = [bildirim_sadelestir(x) for x in tekillestir(ham)]
         self._onbellek.yaz(anahtar, sonuc, BILDIRIM_TTL)
         return sonuc
+
+    async def _ham_bildirimler(
+        self,
+        istemci: httpx.AsyncClient,
+        mkk_oid: str,
+        baslangic: dt.date,
+        bitis: dt.date,
+    ) -> list[dict]:
+        await self._bekle()
+        yanit = await istemci.post(
+            f"{KAP_KOK}/tr/api/disclosure/members/byCriteria",
+            json={
+                "fromDate": str(baslangic),
+                "toDate": str(bitis),
+                "mkkMemberOidList": [mkk_oid],
+                "subjectList": [],
+            },
+            headers={
+                "User-Agent": "Mozilla/5.0",
+                "Referer": BILDIRIM_SORGU_SAYFASI,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=45.0,
+        )
+        yanit.raise_for_status()
+        return yanit.json()
 
     async def bildirim_detay(self, bildirim_no: str) -> dict:
         anahtar = f"kap:detay:{bildirim_no}"

@@ -164,7 +164,14 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    ateşliyordu. 630 hisselik kurulumda bu, kaynak siteye yüzlerce eşzamanlı
    istek demekti. `hiz_sinir.HizSinirlayici` bekleme ve damgayı atomik yapar.
 
-14. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
+14. **KAP bildirim sorgusu en fazla 365 gün kabul eder.** Ölçüldü
+   (2026-09-06, THYAO ve MEKAG): 365 günlük aralık HTTP 200 ve 88/98 kayıt
+   döndürüyor, **366 gün HTTP 500**. `temettu_gecmisi` bir temettü döngüsünü
+   görmek için 400 gün istediğinden her çağrıda kırılıyordu. Daha uzun geçmiş
+   üst üste binmeyen parçalara bölünüp birleştiriliyor; kayıtlar
+   `disclosureIndex` ile tekilleştirilip yeniden eskiye sıralanıyor.
+
+15. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
    807 ticker veriyor, 630'unda fiyat verisi var; kalanı işlem görmeyen ya da
    GARAN'ın `TGB`'si gibi ikincil kodlar ve toplu indirmede kendiliğinden
    düşüyor.
