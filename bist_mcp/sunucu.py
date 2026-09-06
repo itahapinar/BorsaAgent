@@ -437,13 +437,38 @@ ANALIZ_BOLUMLERI = (
 )
 
 
+OZET_ALANLARI = ("fiyat", "pddd", "fk", "temettu_12ay", "temettu_verimi")
+
+
+def _ozet_cikar(oranlar, teknik) -> dict:
+    """Baslik rakamlarini en basa kompakt bir blokta toplar.
+
+    Olculdu: arac temettu_12ay=0,2053'u iki ayri bolumde ve uyari notuyla
+    donderken model cevaba "-" yazdi. Payload 10 bolum, tam bilanco ve
+    gelir tablosu iceriyor; onemli rakamlar en basta tekrarlaniyor.
+    """
+    ozet = {ad: (oranlar or {}).get(ad) for ad in OZET_ALANLARI}
+    macd = (teknik or {}).get("macd")
+    ozet["rsi_14"] = (teknik or {}).get("rsi_14")
+    ozet["macd"] = macd.get("macd") if isinstance(macd, dict) else macd
+    return ozet
+
+
 def analizi_derle(kod: str, sonuclar: dict) -> dict:
     """Bolum sonuclarini tek cevaba toplar, alinamayanlari ACIKCA sayar.
 
     Eksigi gizlemek modelin rakam uydurmasina yol aciyor; hangi bolumun
     gelmedigi soylenirse "yok" diyor.
     """
-    derlenen: dict = {"kod": kod.upper()}
+    def _gecerli(ad):
+        s = sonuclar.get(ad)
+        return None if (s is None or isinstance(s, BaseException)
+                        or (isinstance(s, dict) and "hata" in s)) else s
+
+    derlenen: dict = {
+        "kod": kod.upper(),
+        "ozet": _ozet_cikar(_gecerli("oranlar"), _gecerli("teknik")),
+    }
     eksik: list[str] = []
 
     for ad in ANALIZ_BOLUMLERI:

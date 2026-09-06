@@ -78,3 +78,38 @@ async def test_gercek_hissede_teknik_ve_gelir_tablosu_gelir():
     assert sonuc["gelir_tablosu"]["kalemler"], "gelir tablosu bos geldi"
     assert sonuc["oranlar"]["pddd"] is not None
     assert sonuc["profil"]["unvan"]
+
+
+# --- Ozet blogu ------------------------------------------------------------
+# Olculdu: arac temettu_12ay=0,2053'u hem oranlar hem temettu bolumunde ve
+# "0,00 DEME" notuyla dondurdugu halde model cevaba "-" yazdi. Payload 10
+# bolum + tam bilanco + gelir tablosu; modelin dikkati dagiliyor. Basliktaki
+# rakamlar en basta kompakt bir blokta tekrarlaniyor.
+
+
+def test_ozet_bolumu_bastadir():
+    derlenen = analizi_derle("X", _tam_sonuc())
+    assert list(derlenen)[1] == "ozet", "ozet koddan hemen sonra gelmeli"
+
+
+def test_ozet_baslik_rakamlarini_tasir():
+    sonuclar = _tam_sonuc()
+    sonuclar["oranlar"] = {
+        "fiyat": 11.15, "pddd": 0.97, "fk": None,
+        "temettu_12ay": 0.2053, "temettu_verimi": 1.84,
+    }
+    sonuclar["teknik"] = {"rsi_14": 54.82, "macd": {"macd": -0.34}}
+    ozet = analizi_derle("X", sonuclar)["ozet"]
+    assert ozet["fiyat"] == 11.15
+    assert ozet["pddd"] == 0.97
+    assert ozet["temettu_verimi"] == 1.84
+    assert ozet["rsi_14"] == 54.82
+
+
+def test_ozet_eksik_bolumde_cokmez():
+    sonuclar = _tam_sonuc()
+    sonuclar["oranlar"] = RuntimeError("hata")
+    sonuclar["teknik"] = {"hata": "yok"}
+    ozet = analizi_derle("X", sonuclar)["ozet"]
+    assert ozet["pddd"] is None
+    assert ozet["rsi_14"] is None
