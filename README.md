@@ -201,6 +201,37 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    GARAN'ın `TGB`'si gibi ikincil kodlar ve toplu indirmede kendiliğinden
    düşüyor.
 
+16. **Tarama satırları tamamlandıkça yazılır**, `gather` sonunda toplu değil.
+   Tarama ~8 dakika ve ~700 istek sürüyor; süreç bitmeden kapanırsa toplu
+   yazımda **hiçbir ilerleme kaydedilmiyordu** ve sonraki açılış aynı yükü
+   baştan üretiyordu. Ölçüldü: sunucu bir gün içinde defalarca başlatıldı,
+   `gorunum.db`'de 7 kayıt kaldı ve yfinance hız sınırı devreye girdi.
+
+17. **Tazeleme kararı yaşa DEĞİL, yaş + tamlığa bakar.** 16 numaralı kural
+   yürürlüğe girince yarıda kesilen tarama *taze zaman damgalı ama eksik*
+   bir tablo bırakıyor; yalnızca yaşa bakan karar bunu güncel sanıp bir
+   hafta boyunca tabloyu hiç kurmuyordu. Tablo evrenin %90'ının altındaysa
+   yeniden kurulur. %100 beklenmez: 630 hissenin 21'inde kaynakta finansal
+   tablo yok.
+
+18. **Telegram markdown tablosunu render etmez.** Ölçüldü (canlı bot): boru
+   tablosu ham metin olarak düşüyor ve `parse_mode` verilmezse `**` yıldızları
+   görünüyor. Modele "hizalı monospace yaz" demek işe yaramadı — model
+   markdown üretmekte iyi, sütun hizalamakta değil. Model markdown yazar,
+   `ajan/bicim.py` hizalar ve `<pre>` bloğuna koyar, bot HTML gönderir.
+
+19. **Tablo hücresi asla kırpılmaz ve sayı asla bölünmez.** İlk sürüm
+   genişliği 38 karaktere sıkıştırırken `408,48 milyar`'ı `408,4` + `8 milyar`
+   yapıyordu; bir finans botunda bu okuma hatası doğurur. Yalnızca boşluktan
+   bölünür, uzun değer taşar. Üçüncü sütun satırın altına **başlık adıyla**
+   iner (`2024 Yıllık: 1,83 trilyon TL`), yoksa veri sütunu anlamını kaybeder.
+
+20. **Model biçim kurallarına tutarsız uyar; biçim kodda garanti edilir.**
+   Ölçüldü: binlik ayırıcı olarak boşluk (kırılmaz boşluk dahil) yazdı,
+   `2.351.336.385.167 TL` gibi ham rakam bastı, PD/DD'yi "Pi Değeri / Denge
+   Değeri" diye açtı. İlk ikisi `bicim.py`'de düzeltilir, üçüncüsü için doğru
+   açılım prompta yazılıdır.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce
