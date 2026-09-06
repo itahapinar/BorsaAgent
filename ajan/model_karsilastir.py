@@ -50,7 +50,7 @@ ISTEK_ZAMAN_ASIMI = 30.0
 # desteklemiyordur; kalan 17 soruyu denemenin anlami yok.
 ERKEN_BIRAK = 3
 # Erken birakma ucuzlattigi icin ilk kosudaki 5 yerine daha genis bakiliyor;
-ilk kosuda guclu nemotron modellerinin hicbiri siraya girmemisti.
+# ilk kosuda guclu nemotron modellerinin hicbiri siraya girmemisti.
 DENENECEK_SAYISI = 8
 
 SORULAR: list[tuple[str, str]] = [
