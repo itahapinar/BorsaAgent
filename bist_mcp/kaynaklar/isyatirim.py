@@ -221,19 +221,26 @@ ODENMIS_SERMAYE_ADLARI = (
     "I. ÖDENMİŞ SERMAYE",
     "Ödenmiş sermaye",
 )
-# Nominali 1 TL olmayan bir sirkette odenmis sermaye hisse adedi DEGILDIR.
-# Boyle bir durumda 100 kat sapmamak icin yfinance ile karsilastirilip
-# makul araligin disindaysa reddedilir.
-MAKUL_HISSE_ORANI = (0.5, 2.0)
-
-
 def hisse_adedi_sec(odenmis_sermaye: float | None, yfinance_adet: int | None) -> int | None:
-    """Hisse adedini secer: odenmis sermaye tercih, makul degilse yfinance."""
-    if odenmis_sermaye and yfinance_adet:
-        oran = odenmis_sermaye / yfinance_adet
-        if MAKUL_HISSE_ORANI[0] <= oran <= MAKUL_HISSE_ORANI[1]:
-            return int(odenmis_sermaye)
-        return int(yfinance_adet)
+    """Hisse adedini secer: odenmis sermaye BIRINCIL, yfinance yalnizca yedek.
+
+    Ilk surumde "cok saparsa yfinance'e don" diye bir makullük kontrolu
+    vardi; TERS calisiyordu. Tum evren tarandi, 28 hissede iki kaynak
+    %10'dan fazla ayrisiyor. KAP'in kendi odenmis sermayesi ucuncu kaynak
+    olarak sorulunca kontrol edilebilen 6 vakanin 6'sinda da Is Yatirim'i
+    destekledi:
+
+      kod    Is Yatirim   yfinance      KAP          dogru olan
+      FLAP   93.750.000   150.000       93.750.000   Is Yatirim
+      PKENT  24.883.200   829.440.000   24.883.200   Is Yatirim
+      ORGE   80.000.000   400.000.000   80.000.000   Is Yatirim
+      KRTEK  35.100.498   137.984.613   35.100.498   Is Yatirim
+      GOODY  270.000.000  1.520.000.000 270.000.000  Is Yatirim
+      MPARK  191.012.000  102.122.233   208.037.202  Is Yatirim
+
+    yfinance bu hisselerde 625 kata varan hata yapiyor; eski kontrol tam
+    da bu vakalarda dogru degeri reddedip yanlisi seciyordu.
+    """
     if odenmis_sermaye:
         return int(odenmis_sermaye)
     return int(yfinance_adet) if yfinance_adet else None

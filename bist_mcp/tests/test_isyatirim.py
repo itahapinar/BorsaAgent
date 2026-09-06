@@ -362,11 +362,17 @@ def test_odenmis_sermaye_tercih_edilir():
     assert hisse_adedi_sec(2_600_000_000, 2_528_516_915) == 2_600_000_000
 
 
-def test_makul_olmayan_oranda_yfinance_kullanilir():
-    """Nominali 1 TL olmayan sirkette odenmis sermaye hisse adedi DEGILDIR;
-    100 kat sapmamak icin reddedilir."""
-    assert hisse_adedi_sec(100_000_000, 1_000_000_000) == 1_000_000_000
-    assert hisse_adedi_sec(10_000_000_000, 1_000_000_000) == 1_000_000_000
+def test_buyuk_sapmada_bile_odenmis_sermaye_kazanir():
+    """REGRESYON: ilk surumde "cok saparsa yfinance'e don" kontrolu vardi ve
+    TERS calisiyordu.
+
+    KAP ucuncu kaynak olarak soruldu; kontrol edilebilen 6 vakanin 6'sinda
+    da Is Yatirim dogru cikti. FLAP'ta yfinance 150.000 hisse diyor, gercek
+    93.750.000 — 625 kat hata. Eski kontrol tam da burada yanlisi secerdi.
+    """
+    assert hisse_adedi_sec(93_750_000, 150_000) == 93_750_000        # FLAP
+    assert hisse_adedi_sec(24_883_200, 829_440_000) == 24_883_200    # PKENT
+    assert hisse_adedi_sec(270_000_000, 1_520_000_000) == 270_000_000  # GOODY
 
 
 def test_tek_kaynak_varsa_o_kullanilir():
