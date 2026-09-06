@@ -284,6 +284,18 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    `{"kod": "DOAS", "yil": 5 </tool_call` cevabın başında göründü, sonraki
    koşuda görünmedi — aralıklı. Çıktıda temizleniyor.
 
+29. **Araç çıktısı turlar arası taşınmaz.** Ölçüldü (canlı bot, `sohbet.db`):
+   tur 17'de "mekag detaylı analiz", tur 18'de "**doas** 2025 ve 2026 yılı
+   temettü tarihleri" soruldu ve model aracı `kod="MEKAG"` ile çağırıp
+   **yanlış şirketin** verisini verdi. Önceki turun dev araç çıktısı bağlamda
+   durduğu için model ona demirliyordu.
+
+   Önceki tasarım, takip sorusu ("peki özkaynağı?") veriyi tekrar çekmesin
+   diye son turun araç sonucunu geri gönderiyordu. Bedeli yanlış şirket
+   cevabı; bir finans botunda bu, fazladan bir araç çağrısından çok daha
+   ağır. Tur **içinde** sonuçlar zaten uçuş hâlindeki mesaj listesinde, oradan
+   etkilenmiyor; sonuçlar diske yazılmaya da devam ediyor.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce

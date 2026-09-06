@@ -6,17 +6,9 @@ Uc kural:
      sonucu geri gonderilir. Hepsini gondermek baglami tablolarla doldurup
      hafiza derinligini birkac tura dusuruyordu.
   2. Kirpma token bazlidir, mesaj sayisi bazli degil.
-  3. gecmis() OpenAI uyumlu bir mesaj dizisi dondurur. Olculdu
-     (integrate.api.nvidia.com): ciplak {"role": "tool"} satiri
-     `400 missing field tool_call_id` aliyor. Plandaki tasarim tool
-     sonuclarini boyle kaydediyordu, yani arac kullanan her sohbetin
-     IKINCI sorusu kirilirdi.
-
-     Ayni uc nokta tool_call_id'li ama govdesiz mesaji kabul ediyor;
-     yine de araci cagiran assistant govdesi saklaniyor: OpenAI spec'i
-     bunu sart kosuyor (baska model/uc noktalar reddedebilir) ve model
-     hangi verinin hangi aractan geldigini ancak boyle goruyor. Govde ve
-     sonuc BIRLIKTE durur, birlikte duser.
+  3. Arac ciktilari turlar arasi TASINMAZ. Olculdu: onceki turun dev
+     arac ciktisi baglamda kalinca model yeni soruda o sirketin kodunu
+     kullaniyordu (mekag -> doas). Sonuclar diske yazilmaya devam eder.
 """
 
 import json
@@ -95,38 +87,28 @@ class Hafiza:
             for s in self._baglanti.execute("SELECT * FROM mesaj ORDER BY id").fetchall()
         ]
 
-    def _son_arac_turu(self) -> int:
-        """Arac calistirilan EN SON tur.
-
-        MAX(tur) degil: yeni soru turu hemen artiriyor, o yuzden MAX(tur)
-        ile bakinca onceki turun arac verisi daha modele gitmeden dusuyordu
-        ve "son turun sonucu geri gonderilir" kurali pratikte hicbir sey
-        gondermiyordu. Takip sorusu ("peki ozkaynagi?") veriyi goremezdi.
-        """
-        satir = self._baglanti.execute(
-            "SELECT MAX(tur) AS t FROM mesaj WHERE arac_sonucu = 1"
-        ).fetchone()
-        return satir["t"] or 0
-
     def gecmis(self) -> list[dict]:
-        """Modele gonderilecek mesaj listesi (eski -> yeni)."""
-        son_tur = self._son_arac_turu()
+        """Modele gonderilecek mesaj listesi (eski -> yeni).
+
+        ARAC CIKTILARI TURLAR ARASI TASINMAZ. Olculdu (canli bot): tur
+        17'de "mekag detayli analiz", tur 18'de "doas temettu tarihleri"
+        soruldu ve model araci kod="MEKAG" ile cagirdi -- onceki turun dev
+        arac ciktisi baglamda durdugu icin ona demirledi ve YANLIS
+        SIRKETIN verisini verdi.
+
+        Onceki tasarim son turun arac sonucunu geri gonderiyordu ki takip
+        sorusu ("peki ozkaynagi?") veriyi tekrar cekmesin. Bedeli yanlis
+        sirket cevabi; bir finans botunda bu, fazladan bir arac
+        cagrisindan cok daha agir. Tur ICINDE sonuclar zaten ucus
+        halindeki mesaj listesinde duruyor, oradan etkilenmiyor.
+
+        Sonuclar diske YAZILMAYA devam eder (ham_kayitlar).
+        """
         satirlar = self._baglanti.execute(
-            "SELECT rol, icerik, arac_sonucu, tur, ek FROM mesaj ORDER BY id"
+            "SELECT rol, icerik, ek FROM mesaj WHERE arac_sonucu = 0 ORDER BY id"
         ).fetchall()
-
-        secilen: list[dict] = []
-        for s in satirlar:
-            # Tur-bagimli satirlar: hem tool sonuclari hem onlari ureten
-            # assistant govdesi. Ikisi birlikte durur ya da birlikte duser.
-            if s["arac_sonucu"] and s["tur"] != son_tur:
-                continue
-            mesaj: dict = {"role": s["rol"], "content": s["icerik"]}
-            ek = json.loads(s["ek"]) if s["ek"] else {}
-            mesaj.update(ek)
-            secilen.append(mesaj)
-
-        return self._tutarli_kil(self._kirp(secilen))
+        secilen = [{"role": s["rol"], "content": s["icerik"]} for s in satirlar]
+        return self._kirp(secilen)
 
     def _olcu(self, mesaj: dict) -> int:
         return kaba_token(mesaj.get("content") or "") + kaba_token(
@@ -138,16 +120,6 @@ class Hafiza:
         toplam = sum(self._olcu(m) for m in mesajlar)
         while len(mesajlar) > 1 and toplam > self._tavan:
             toplam -= self._olcu(mesajlar.pop(0))
-        return mesajlar
-
-    def _tutarli_kil(self, mesajlar: list[dict]) -> list[dict]:
-        """Bastan kirpma bir tool mesajini govdesiz birakmis olabilir.
-
-        Sahipsiz tool mesaji uc noktadan 400 aliyor; govdesi dusmusse
-        sonucu da dusur.
-        """
-        while mesajlar and mesajlar[0]["role"] == "tool":
-            mesajlar.pop(0)
         return mesajlar
 
     def sifirla(self) -> None:

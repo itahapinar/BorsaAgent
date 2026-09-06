@@ -166,13 +166,13 @@ async def test_sistem_promptu_her_istekte_var(tmp_path):
 # --- Task 4 + Task 6 dikisi ------------------------------------------------
 
 
-async def test_ikinci_soruda_gonderilen_mesajlar_api_gecerli(tmp_path):
-    """Ilk turda arac kullanildiysa ikinci soru kirilmamali.
+async def test_ikinci_soruda_arac_verisi_tasinmaz(tmp_path):
+    """Olculdu (canli bot): tur 17 MEKAG, tur 18'de "doas ..." soruldu ve
+    model araci kod="MEKAG" ile cagirdi. Onceki turun dev arac ciktisi
+    baglamda kaldigi icin ona demirlemisti.
 
-    Olculdu: ciplak {"role": "tool"} satiri uc noktadan
-    `400 missing field tool_call_id` aliyor. Arac cagrisi hafizaya
-    tool_call_id ve assistant govdesiyle yazilmazsa arac kullanan her
-    sohbetin ikinci sorusu patlardi.
+    Ikinci turda gonderilen mesajlar hem API bicimine uymali hem de onceki
+    turun arac verisini TASIMAMALI.
     """
     llm = SahteLLM(_fiyat_turu() + [SahteYanit([SahteSecim(SahteMesaj(content="dun de 296"))])])
     ajan = _ajan(tmp_path, llm)
@@ -180,14 +180,9 @@ async def test_ikinci_soruda_gonderilen_mesajlar_api_gecerli(tmp_path):
     await ajan.cevapla("peki dun?")
 
     gonderilen = llm.istekler[-1]["messages"]
-    acik: set[str] = set()
-    for m in gonderilen:
-        if m["role"] == "assistant" and m.get("tool_calls"):
-            acik = {c["id"] for c in m["tool_calls"]}
-        elif m["role"] == "tool":
-            assert m.get("tool_call_id"), f"tool_call_id yok: {m}"
-            assert m["tool_call_id"] in acik, f"sahipsiz tool mesaji: {m}"
-    assert any(m["role"] == "tool" for m in gonderilen), "arac verisi ikinci tura tasinmadi"
+    assert all(m["role"] != "tool" for m in gonderilen), "arac verisi sizmis"
+    assert all(not m.get("tool_calls") for m in gonderilen), "sahipsiz govde kalmis"
+    assert any("peki dun?" in (m.get("content") or "") for m in gonderilen)
 
 
 # --- Ozet kart yukseltme ---------------------------------------------------

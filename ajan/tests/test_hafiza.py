@@ -39,22 +39,6 @@ def _tur_yaz(hafiza, soru, cagri_id, arac_metni, cevap):
     hafiza.ekle("assistant", cevap)
 
 
-def test_yalnizca_son_turun_arac_sonucu_baglama_girer(tmp_path):
-    """Eski tablolar baglami doldurup hafiza derinligini oldururdu.
-
-    Arac sonuclari SQLite'a yine yazilir (hata ayiklama icin), ama modele
-    yalnizca son turunki geri gonderilir.
-    """
-    hafiza = Hafiza(tmp_path / "s.db")
-    _tur_yaz(hafiza, "GARAN bilanco", "c1", "ESKI TABLO", "iste bilanco")
-    _tur_yaz(hafiza, "peki ozkaynagi?", "c2", "YENI TABLO", "ozkaynak su kadar")
-
-    icerikler = [m.get("content") for m in hafiza.gecmis()]
-    assert "YENI TABLO" in icerikler
-    assert "ESKI TABLO" not in icerikler
-    assert "iste bilanco" in icerikler
-
-
 def test_tavan_asilinca_en_eski_mesajlar_duser(tmp_path):
     hafiza = Hafiza(tmp_path / "s.db", tavan_token=100)
     hafiza.ekle("user", "ILK MESAJ")
@@ -99,16 +83,6 @@ def test_gecmis_api_bicimine_uyar(tmp_path):
     _gecerli_mi(hafiza.gecmis())
 
 
-def test_eski_turun_assistant_govdesi_de_dusurulur(tmp_path):
-    """Arac sonucu dusup govdesi kalirsa API 'sahipsiz tool_calls' der."""
-    hafiza = Hafiza(tmp_path / "s.db")
-    _tur_yaz(hafiza, "GARAN bilanco", "c1", "ESKI", "cevap1")
-    _tur_yaz(hafiza, "ozkaynak?", "c2", "YENI", "cevap2")
-    govdeler = [m for m in hafiza.gecmis() if m.get("tool_calls")]
-    assert len(govdeler) == 1, "yalnizca son turun govdesi kalmali"
-    assert govdeler[0]["tool_calls"][0]["id"] == "c2"
-
-
 def test_kirpma_sahipsiz_tool_mesaji_birakmaz(tmp_path):
     """Tavan cok dusukse kirpma govdeyi yiyip tool mesajini birakabilirdi."""
     hafiza = Hafiza(tmp_path / "s.db", tavan_token=1)
@@ -132,3 +106,35 @@ def test_kapatilan_hafizanin_dosyasi_silinebilir(tmp_path):
     hafiza.kapat()
     yol.unlink()
     assert not yol.exists()
+
+
+# --- Turlar arasi arac verisi ----------------------------------------------
+# Olculdu (canli bot, sohbet.db): tur 17'de "mekag detayli analiz" soruldu,
+# tur 18'de "doas 2025 ve 2026 yili temettu tarihleri" soruldu ve model
+# araci kod="MEKAG" ile cagirdi. Onceki turun dev arac ciktisi baglamda
+# durdugu icin model ona demirledi ve YANLIS SIRKETIN verisini verdi.
+# Bir finans botunda bu, fazladan bir arac cagrisindan cok daha agir.
+
+
+def test_onceki_turun_arac_verisi_baglama_tasinmaz(tmp_path):
+    hafiza = Hafiza(tmp_path / "s.db")
+    _tur_yaz(hafiza, "mekag detaylı analiz", "c1", "MEKAG TABLOSU", "MEKAG analizi")
+    hafiza.ekle("user", "doas temettü tarihleri")
+
+    icerikler = [m.get("content") or "" for m in hafiza.gecmis()]
+    assert not any("MEKAG TABLOSU" in i for i in icerikler), "arac verisi sizmis"
+    assert any("MEKAG analizi" in i for i in icerikler), "asistan cevabi kalmali"
+
+
+def test_ayni_turda_bile_arac_verisi_gecmise_girmez(tmp_path):
+    """Tur icinde arac sonucu zaten ucus halindeki mesaj listesinde."""
+    hafiza = Hafiza(tmp_path / "s.db")
+    _tur_yaz(hafiza, "GARAN bilanço", "c1", "TABLO", "cevap")
+    assert all(m["role"] != "tool" for m in hafiza.gecmis())
+    assert all(not m.get("tool_calls") for m in hafiza.gecmis())
+
+
+def test_arac_verisi_diskte_kalmaya_devam_eder(tmp_path):
+    hafiza = Hafiza(tmp_path / "s.db")
+    _tur_yaz(hafiza, "GARAN bilanço", "c1", "TABLO", "cevap")
+    assert "TABLO" in [s["icerik"] for s in hafiza.ham_kayitlar()]
