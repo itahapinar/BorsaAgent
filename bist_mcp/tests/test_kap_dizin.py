@@ -44,7 +44,9 @@ def test_tek_kodlu_sirket_normal_islenir():
         unvan="ASELSAN ELEKTRONİK SANAYİ VE TİCARET A.Ş.",
         mkk_oid="4028e4a1413b7ef401413bc2251e0047",
         tip="SIR",
+        tum_kodlar=("ASELS",),
     )
+    assert not dizin["ASELS"].coklu_sinif
 
 
 def test_kodsuz_kayit_atlanir():
@@ -74,3 +76,35 @@ def test_bos_tip_yedek_gerektirir():
     assert grup == "XI_29"
     assert yedek_grup(grup) == "UFRS_K"
     assert yedek_grup("UFRS_K") == "XI_29"
+
+
+# --- Coklu hisse sinifi ---
+# Olculdu: ISATR/ISBTR/ISCTR/ISKUR/TIB ayni sirket (Turkiye Is Bankasi),
+# KAP'ta tek kayit, odenmis sermaye 10 mlr TL. Bu sermayeyi tek sinifa
+# atamak ISATR'da PD/DD'yi 272.562 gosteriyordu.
+
+IS_BANKASI_HAM = {
+    "stockCode": "ISATR, ISBTR, ISCTR, ISKUR, TIB",
+    "kapMemberTitle": "TÜRKİYE İŞ BANKASI A.Ş.",
+    "mkkMemberOid": "oid-isbank",
+    "financialType": "BNK",
+}
+
+
+def test_coklu_sinif_isaretleniyor():
+    dizin = dizin_kur([IS_BANKASI_HAM])
+    assert dizin["ISATR"].coklu_sinif
+    assert dizin["ISCTR"].coklu_sinif
+    assert dizin["ISATR"].tum_kodlar == ("ISATR", "ISBTR", "ISCTR", "ISKUR", "TIB")
+
+
+def test_tek_sinif_coklu_isaretlenmez():
+    dizin = dizin_kur([ASELS_HAM])
+    assert not dizin["ASELS"].coklu_sinif
+
+
+def test_iki_kodlu_sirket_de_coklu_sayilir():
+    """GARAN, TGB - ikinci kod ayri bir siniftir."""
+    dizin = dizin_kur([GARAN_HAM])
+    assert dizin["GARAN"].coklu_sinif
+    assert dizin["GARAN"].tum_kodlar == ("GARAN", "TGB")

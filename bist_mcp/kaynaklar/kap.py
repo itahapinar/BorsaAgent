@@ -33,6 +33,14 @@ class Sirket:
     unvan: str
     mkk_oid: str
     tip: str | None
+    # Ayni sirketin borsada islem goren tum kodlari. Birden fazlaysa her
+    # kod ayri bir hisse SINIFI demektir (ISATR/ISBTR/ISCTR gibi) ve
+    # odenmis sermaye TUM siniflarin toplamidir - tek sinifa atanamaz.
+    tum_kodlar: tuple[str, ...] = ()
+
+    @property
+    def coklu_sinif(self) -> bool:
+        return len(self.tum_kodlar) > 1
 
 
 def dizin_kur(ham: list[dict]) -> dict[str, Sirket]:
@@ -54,10 +62,11 @@ def dizin_kur(ham: list[dict]) -> dict[str, Sirket]:
         oid = kayit.get("mkkMemberOid") or ""
         tip = kayit.get("financialType") or None
 
-        for parca in ham_kod.split(","):
-            kod = parca.strip()
-            if kod and kod != "-":
-                dizin[kod] = Sirket(kod=kod, unvan=unvan, mkk_oid=oid, tip=tip)
+        kodlar = tuple(k.strip() for k in ham_kod.split(",") if k.strip() and k.strip() != "-")
+        for kod in kodlar:
+            dizin[kod] = Sirket(
+                kod=kod, unvan=unvan, mkk_oid=oid, tip=tip, tum_kodlar=kodlar
+            )
 
     return dizin
 

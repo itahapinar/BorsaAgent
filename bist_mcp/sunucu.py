@@ -250,6 +250,26 @@ async def finansal_oranlar(kod: str) -> dict:
         satir["not"] = "Ozkaynak verisi bulunamadi; PD/DD hesaplanamadi."
     elif girdiler["net_kar_ttm"] is None:
         satir["not"] = "Son 12 ay kari hesaplanamadi; F/K verilemiyor."
+
+    # Makullük kontrolu. Coklu hisse sinifi olan sirketlerde odenmis sermaye
+    # TUM siniflarin toplamidir ve tek sinifa atanamaz; ISATR'da PD/DD
+    # 272.562 gibi sacma bir sonuc cikiyordu. Sayiyi uydurmak yerine
+    # guvenilmez oldugunu soyle.
+    pddd_degeri = satir.get("pddd")
+    if pddd_degeri is not None and not (0.01 <= pddd_degeri <= 50):
+        if sirket and sirket.coklu_sinif:
+            satir["not"] = (
+                f"{kod.upper()} coklu hisse sinifi olan bir sirketin "
+                f"({', '.join(sirket.tum_kodlar)}) tek sinifi. Odenmis sermaye tum "
+                "siniflarin toplami oldugu icin bu sinifin hisse adedi bilinmiyor ve "
+                "F/K ile PD/DD GUVENILMEZ. Bu oranlari verme; ana sinifi oner."
+            )
+        else:
+            satir["not"] = (
+                f"PD/DD ({pddd_degeri:.1f}) olagandisi. Sirketin ozkaynagi erimis "
+                "olabilir ya da veri hatali olabilir; bu orani kesin bir olcu gibi "
+                "sunma, temkinli aktar."
+            )
     return satir
 
 
