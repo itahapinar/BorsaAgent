@@ -122,3 +122,13 @@ def test_arac_sonuclari_diskte_kalir(tmp_path):
     _tur_yaz(hafiza, "GARAN bilanco", "c1", "ESKI TABLO", "cevap1")
     _tur_yaz(hafiza, "ozkaynak?", "c2", "YENI TABLO", "cevap2")
     assert "ESKI TABLO" in [s["icerik"] for s in hafiza.ham_kayitlar()]
+
+
+def test_kapatilan_hafizanin_dosyasi_silinebilir(tmp_path):
+    """Windows acik SQLite baglantisindaki dosyayi kilitliyor."""
+    yol = tmp_path / "s.db"
+    hafiza = Hafiza(yol)
+    hafiza.ekle("user", "merhaba")
+    hafiza.kapat()
+    yol.unlink()
+    assert not yol.exists()

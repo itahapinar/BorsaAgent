@@ -153,3 +153,11 @@ class Hafiza:
     def sifirla(self) -> None:
         self._baglanti.execute("DELETE FROM mesaj")
         self._baglanti.commit()
+
+    def kapat(self) -> None:
+        """SQLite baglantisini birakir.
+
+        Windows acik baglantidaki dosyayi kilitliyor; kapatilmadan dosya
+        silinemiyor ya da tasinamiyor.
+        """
+        self._baglanti.close()
