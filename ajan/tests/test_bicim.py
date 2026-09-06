@@ -186,7 +186,7 @@ def test_ucuncu_sutun_satirin_altina_girintili_yazilir():
 
 def test_bosluklu_binlik_ayirici_noktaya_cevrilir():
     """Olculdu: model kurala ragmen "44 799 808" yaziyor. Turkce bicim nokta."""
-    assert "44.799.808" in telegram_html("Hacim 44 799 808 lot")
+    assert "44.799" in telegram_html("Hacim 44 799 lot")
     assert "1.018,52" in telegram_html("Özkaynak 1 018,52 milyar TL")
 
 
@@ -210,7 +210,7 @@ def test_alta_inen_sutun_baslik_adiyla_etiketlenir():
 
 def test_kirilmaz_bosluklu_sayi_da_duzeltilir():
     """Model bazen U+00A0/U+202F yaziyor; duz bosluk arayan kontrol kaciriyor."""
-    assert "44.799.808" in telegram_html("Hacim 44\u00a0799\u00a0808 lot")
+    assert "44.799" in telegram_html("Hacim 44\u00a0799 lot")
     assert "1.018,52" in telegram_html("Özkaynak 1\u202f018,52 milyar TL")
 
 
@@ -245,3 +245,10 @@ def test_kucuk_tutarlar_ve_yillar_degismez():
 def test_bosluklu_tutar_hem_duzeltilir_hem_kisaltilir():
     """Iki duzeltme birlikte calismali: bosluk -> nokta, sonra kisaltma."""
     assert "44,80 milyon TL" in telegram_html("Hacim 44 799 808 TL")
+
+
+def test_birimsiz_buyuk_sayilar_da_kisaltilir():
+    """Bilanco tablosunda model birimi baslikta veriyor, hucrede yazmiyor."""
+    sonuc = telegram_html("| Kalem | 2025 |\n|---|---|\n| Varlıklar | 2.351.336.385.167 |")
+    assert "2,35 trilyon" in sonuc
+    assert "2,35 trilyon TL" not in sonuc, "olmayan birim uydurulmamali"

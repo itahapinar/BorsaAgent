@@ -30,15 +30,16 @@ def tarih(deger) -> str:
     return deger.strftime("%d.%m.%Y")
 
 
-def buyuk_sayi(deger: float) -> str:
+def buyuk_sayi(deger: float, birim: str = "TL") -> str:
     """Buyuk TL tutarlarini okunabilir kisaltir.
 
     1.073.081.134.047 gibi bir rakami ham gostermek cevabi okunmaz yapiyor.
     """
+    son = f" {birim}" if birim else ""
     for esik, ad in ((1e12, "trilyon"), (1e9, "milyar"), (1e6, "milyon")):
         if abs(deger) >= esik:
-            return f"{_turkce_sayi(deger / esik)} {ad} TL"
-    return tl(deger)
+            return f"{_turkce_sayi(deger / esik)} {ad}{son}"
+    return tl(deger) if birim == "TL" else f"{_turkce_sayi(deger)}{son}"
 
 
 def mesaji_bol(metin: str, sinir: int = TELEGRAM_SINIRI) -> list[str]:
@@ -114,17 +115,19 @@ def _binlik_ayiriciyi_duzelt(metin: str) -> str:
 
 
 # Olculdu: model "buyuk rakamlari okunabilir yaz" kuralina tutarsiz uyuyor;
-# bazen 2.351.336.385.167 TL gibi ham basiyor ve bu hem okunmuyor hem de
-# tablo sutununa sigmiyor. En az 1.000.000 olan TL tutarlari cevrilir;
-# modelin zaten "1,07 trilyon TL" yazdigi yerlere dokunulmaz.
-HAM_TUTAR = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3}){2,})(,\d+)?(\s*)TL\b")
+# bir kosuda "2,35 trilyon TL", digerinde "2.351.336.385.167" basiyor. Ham
+# rakam hem okunmuyor hem tablo sutununa sigmiyor. Bilanco tablolarinda
+# birimi baslikta verip hucrede yazmadigi icin "TL" zorunlu degil; birim
+# yoksa cevride de birim UYDURULMAZ.
+HAM_TUTAR = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3}){2,})(,\d+)?(\s*TL\b)?")
 
 
 def _ham_tutarlari_kisalt(metin: str) -> str:
     def cevir(eslesme: re.Match) -> str:
         tamsayi = eslesme.group(1).replace(".", "")
         ondalik = (eslesme.group(2) or ",0").replace(",", ".")
-        return buyuk_sayi(float(tamsayi + ondalik))
+        birim = "TL" if eslesme.group(3) else ""
+        return buyuk_sayi(float(tamsayi + ondalik), birim)
 
     return HAM_TUTAR.sub(cevir, metin)
 
