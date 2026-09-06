@@ -14,7 +14,7 @@ import sqlite3
 import time
 from pathlib import Path
 
-from bist_mcp.hesap import fk, pddd, piyasa_degeri, temettu_verimi
+from bist_mcp.hesap import fk, oran_makul, pddd, piyasa_degeri, temettu_verimi
 from bist_mcp.kaynaklar.isyatirim import (  # noqa: F401
     NET_KAR_ADLARI,
     OZKAYNAK_ADLARI,
@@ -236,6 +236,16 @@ class AnlikGorunum:
                     piyasa["temettu_12ay"],
                     piyasa.get("ortalama_hacim_tl"),
                 )
+
+            # Coklu hisse sinifinda odenmis sermaye TUM siniflarin toplami
+            # olabilir; o zaman tek sinifin hisse adedi bilinmiyor ve oran
+            # sacmaliyor (olculdu: ISATR PD/DD 272.562, ISBTR 28.242).
+            # AMA "GARAN, TGB" gibi ikincil kodlar da coklu gorunuyor ve
+            # onlarin orani dogru; kosulsuz silmek GARAN, VAKBN, YKBNK dahil
+            # 21 saglam hisseyi bozuyordu. Once makullige bakilir.
+            if sirket and sirket.coklu_sinif and not oran_makul(satir.get("pddd")):
+                for alan in ("pddd", "fk", "piyasa_degeri"):
+                    satir[alan] = None
 
             # Satir HEMEN yazilir, gather'in sonu beklenmez: tarama ~7 dakika
             # ve ~700 istek suruyor, surec o bitmeden kapanirsa tum ilerleme

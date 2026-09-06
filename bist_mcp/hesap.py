@@ -39,3 +39,15 @@ def temettu_verimi(temettu_12ay_tl: float, fiyat_tl: float) -> float:
     if fiyat_tl <= 0:
         raise ValueError("fiyat pozitif olmali")
     return temettu_12ay_tl / fiyat_tl * 100
+
+
+# PD/DD bu araligin disindaysa oran guvenilmez sayilir: ozkaynak erimis
+# olabilir ya da hisse adedi yanlis cozulmustur.
+MAKUL_PDDD = (0.01, 50.0)
+
+
+def oran_makul(pddd_degeri: float | None) -> bool:
+    """PD/DD makul araliktaysa True. None ise karar verilemez, True doner."""
+    if pddd_degeri is None:
+        return True
+    return MAKUL_PDDD[0] <= pddd_degeri <= MAKUL_PDDD[1]

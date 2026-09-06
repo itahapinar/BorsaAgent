@@ -207,15 +207,16 @@ class SahteFiyat:
 class SahteIsYatirim:
     """BBB'de takilir; AAA'nin satirinin yazilip yazilmadigini olcmek icin."""
 
-    def __init__(self):
+    def __init__(self, ozkaynak: dict | None = None):
         self.engel = asyncio.Event()
+        self._ozkaynak = ozkaynak or {}
 
     async def oran_girdileri(self, kod, tip):
         if kod == "BBB":
             await self.engel.wait()
         return {
             "odenmis_sermaye": 1_000_000,
-            "ozkaynak_tl": 500_000_000.0,
+            "ozkaynak_tl": self._ozkaynak.get(kod, 500_000_000.0),
             "net_kar_ttm": 50_000_000.0,
         }
 
@@ -258,3 +259,60 @@ async def test_tarama_bitince_tum_satirlar_yazilir(tmp_path):
     yazilan = await gorunum.tam_kurulum(["AAA", "BBB"])
     assert yazilan == 2
     assert await _satir_sayisi(gorunum) == 2
+
+
+# --- Coklu hisse sinifi ----------------------------------------------------
+# Olculdu: finansal_oranlar coklu sinifta uyari doneyorken tarama tablosuna
+# ayni sacma deger yaziliyordu -- ISATR PD/DD 272.562, ISBTR 28.242. Odenmis
+# sermaye TUM siniflarin toplami oldugu icin bu siniflarin hisse adedi
+# bilinmiyor; oran da piyasa degeri de guvenilmez.
+
+
+class CokluSinifKap:
+    async def sirket_dizini(self):
+        return {
+            "AAA": Sirket(kod="AAA", unvan="Tek A.S.", mkk_oid="o", tip=None,
+                          tum_kodlar=("AAA",)),
+            "BBB": Sirket(kod="BBB", unvan="Coklu A.S.", mkk_oid="o", tip=None,
+                          tum_kodlar=("BBB", "CCC")),
+        }
+
+
+async def test_coklu_sinifta_MAKUL_oran_korunur(tmp_path):
+    """KAP'ta "GARAN, TGB" gibi ikincil kodlar da coklu sinif gorunuyor.
+
+    Bunlar ayri hisse sinifi DEGIL, ayni hissenin baska kodu. Coklu sinif
+    diye kosulsuz oran silmek GARAN, VAKBN, YKBNK, TSKB gibi 21 saglam
+    hissenin dogru oranini siliyordu (olculdu). Once makullige bakilir.
+    """
+    isyatirim = SahteIsYatirim()
+    isyatirim.engel.set()
+    gorunum = AnlikGorunum(
+        tmp_path / "g.db", kap=CokluSinifKap(), isyatirim=isyatirim, fiyat=SahteFiyat()
+    )
+    await gorunum.tam_kurulum(["AAA", "BBB"])
+
+    satir = gorunum._baglanti.execute(
+        "SELECT * FROM gorunum WHERE kod = 'BBB'"
+    ).fetchone()
+    assert satir["pddd"] is not None, "makul oran coklu sinifta da korunmali"
+
+
+async def test_coklu_sinifta_MAKULSUZ_oran_tabloya_yazilmaz(tmp_path):
+    """ISATR PD/DD 272.562 gibi bir deger oran degil, hisse adedi hatasidir."""
+    isyatirim = SahteIsYatirim(ozkaynak={"BBB": 1.0})  # defter degeri ~0 -> devasa PD/DD
+    isyatirim.engel.set()
+    gorunum = AnlikGorunum(
+        tmp_path / "g.db", kap=CokluSinifKap(), isyatirim=isyatirim, fiyat=SahteFiyat()
+    )
+    await gorunum.tam_kurulum(["AAA", "BBB"])
+
+    satirlar = {
+        s["kod"]: s
+        for s in gorunum._baglanti.execute("SELECT * FROM gorunum").fetchall()
+    }
+    assert satirlar["AAA"]["pddd"] is not None, "tek sinif etkilenmemeli"
+    assert satirlar["BBB"]["pddd"] is None
+    assert satirlar["BBB"]["fk"] is None
+    assert satirlar["BBB"]["piyasa_degeri"] is None
+    assert satirlar["BBB"]["fiyat"] == 100.0, "fiyat gecerli, silinmemeli"

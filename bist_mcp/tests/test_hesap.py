@@ -57,3 +57,13 @@ def test_sifir_hisse_adedi_hata_verir():
 def test_negatif_ozkaynakta_pddd_none_doner():
     """Teknik iflastaki sirkette PD/DD anlamsizdir."""
     assert pddd(10.0, -500_000, 1_000) is None
+
+
+def test_makul_oran_araligi():
+    """ISATR'de PD/DD 272.562 cikmisti; boyle bir deger oran degil, hatadir."""
+    from bist_mcp.hesap import oran_makul
+
+    assert oran_makul(1.13)
+    assert oran_makul(None), "veri yoksa karar verilemez"
+    assert not oran_makul(272562.0)
+    assert not oran_makul(0.0)

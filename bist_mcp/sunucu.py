@@ -18,6 +18,7 @@ from mcp.server.fastmcp import FastMCP
 
 from bist_mcp.anlik_gorunum import AnlikGorunum, satir_hesapla
 from bist_mcp.evren import tarama_evreni
+from bist_mcp.hesap import oran_makul
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
 from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, hisse_adedi_sec, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
@@ -275,7 +276,7 @@ async def finansal_oranlar(kod: str) -> dict:
     # 272.562 gibi sacma bir sonuc cikiyordu. Sayiyi uydurmak yerine
     # guvenilmez oldugunu soyle.
     pddd_degeri = satir.get("pddd")
-    if pddd_degeri is not None and not (0.01 <= pddd_degeri <= 50):
+    if not oran_makul(pddd_degeri):
         if sirket and sirket.coklu_sinif:
             satir["not"] = (
                 f"{kod.upper()} coklu hisse sinifi olan bir sirketin "
