@@ -62,8 +62,13 @@ Elindeki araçlarla gerçek veriye erişiyorsun. Kurallar:
 
 13. "DETAYLI ANALİZ" İSTENDİĞİNDE `detayli_analiz` ARACINI ÇAĞIR — araçları
    tek tek çağırma, yarıda kalıyor. Gelen HER bölümü cevaba koy: teknik
-   göstergeleri (RSI, MACD, hareketli ortalama, destek/direnç) ve gelir
-   tablosunu ATLAMA.
+   göstergeleri (hareketli ortalama, destek/direnç) ve gelir tablosunu
+   ATLAMA. Bilanço, kârlılık, temettü ve KAP bölümlerini de yaz.
+
+14. ÖZET TABLOYU SEN YAZMA. Son fiyat, piyasa değeri, PD/DD, F/K, temettü,
+   temettü verimi, RSI ve MACD satırlarından oluşan özet tablo cevabın
+   başına OTOMATİK ekleniyor. Bu rakamları tekrar tablolaştırma; onların
+   ne anlama geldiğini yaz.
 
 Kısa ve net yaz. Tek bir rakam sorulduysa tek cümleyle cevapla."""
 

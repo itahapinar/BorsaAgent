@@ -188,3 +188,57 @@ async def test_ikinci_soruda_gonderilen_mesajlar_api_gecerli(tmp_path):
             assert m.get("tool_call_id"), f"tool_call_id yok: {m}"
             assert m["tool_call_id"] in acik, f"sahipsiz tool mesaji: {m}"
     assert any(m["role"] == "tool" for m in gonderilen), "arac verisi ikinci tura tasinmadi"
+
+
+# --- Ozet kart yukseltme ---------------------------------------------------
+# Olculdu: model dogru rakami dort ayri yerde gormesine ragmen temettu
+# verimini "%0,0" yaziyordu. Uc yaklasim (prompt kurali, uyari notu, ozet
+# blogu) tutmadi. Baslik rakamlari artik modelden GECMIYOR: arac sonucunda
+# `ozet_kart` alani varsa ajan onu cevabin basina oldugu gibi ekler.
+# Kural genel; ajan aracin ne yaptigini bilmez, yalnizca bu alan adini bilir.
+
+KART = "| Son fiyat | 11,15 TL |\n| Temettü verimi | %1,84 |"
+
+
+class KartliMcp(SahteMcp):
+    async def cagir(self, ad, argumanlar):
+        self.cagrilanlar.append((ad, argumanlar))
+        return json.dumps({"kod": "GENKM", "ozet_kart": KART, "oranlar": {}})
+
+
+async def test_ozet_kart_cevabin_basina_eklenir(tmp_path):
+    llm = SahteLLM(_fiyat_turu(cevap="Şirket kimya sektöründe faaliyet gösteriyor."))
+    cevap = await _ajan(tmp_path, llm, KartliMcp()).cevapla("GENKM detaylı analiz")
+    assert cevap.startswith(KART)
+    assert "kimya sektöründe" in cevap
+
+
+async def test_kartsiz_arac_cevabi_degistirmez(tmp_path):
+    llm = SahteLLM(_fiyat_turu(cevap="THYAO 296,00 TL"))
+    assert await _ajan(tmp_path, llm, SahteMcp()).cevapla("THYAO") == "THYAO 296,00 TL"
+
+
+async def test_ayni_kart_iki_kez_eklenmez(tmp_path):
+    """Model araci iki kez cagirirsa kart tekrarlanmamali."""
+    cagrilar = [
+        SahteCagri("detayli_analiz", '{"kod":"GENKM"}', id="a"),
+        SahteCagri("detayli_analiz", '{"kod":"GENKM"}', id="b"),
+    ]
+    llm = SahteLLM(
+        [
+            SahteYanit([SahteSecim(SahteMesaj(tool_calls=cagrilar))]),
+            SahteYanit([SahteSecim(SahteMesaj(content="yorum"))]),
+        ]
+    )
+    cevap = await _ajan(tmp_path, llm, KartliMcp()).cevapla("GENKM")
+    assert cevap.count("Son fiyat") == 1
+
+
+async def test_bozuk_json_sonucta_cokmez(tmp_path):
+    class BozukMcp(SahteMcp):
+        async def cagir(self, ad, argumanlar):
+            self.cagrilanlar.append((ad, argumanlar))
+            return "HATA: arac calistirilamadi"
+
+    llm = SahteLLM(_fiyat_turu(cevap="veri alinamadi"))
+    assert await _ajan(tmp_path, llm, BozukMcp()).cevapla("X") == "veri alinamadi"

@@ -316,3 +316,10 @@ async def test_coklu_sinifta_MAKULSUZ_oran_tabloya_yazilmaz(tmp_path):
     assert satirlar["BBB"]["fk"] is None
     assert satirlar["BBB"]["piyasa_degeri"] is None
     assert satirlar["BBB"]["fiyat"] == 100.0, "fiyat gecerli, silinmemeli"
+
+
+def test_temettu_bilinmiyorsa_satirda_sifir_yazmaz():
+    """Sessiz sifir "temettu odenmedi" diye okunuyordu."""
+    satir = satir_hesapla(TEMEL, fiyat=296.00, temettu_12ay=None)
+    assert satir["temettu_12ay"] is None
+    assert satir["temettu_verimi"] is None

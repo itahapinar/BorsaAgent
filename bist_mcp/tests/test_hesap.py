@@ -67,3 +67,10 @@ def test_makul_oran_araligi():
     assert oran_makul(None), "veri yoksa karar verilemez"
     assert not oran_makul(272562.0)
     assert not oran_makul(0.0)
+
+
+def test_temettu_verisi_yoksa_verim_sifir_degil_bilinmiyor():
+    """Olculdu: toplu indirme bos donunce temettu 0.0 sayiliyordu ve cevap
+    "temettu odenmemis" diyordu. Odenmemis olmakla bilinmemek ayri seyler."""
+    assert temettu_verimi(None, 296.0) is None
+    assert temettu_verimi(0.0, 296.0) == 0.0

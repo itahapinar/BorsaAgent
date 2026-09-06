@@ -113,3 +113,13 @@ def test_ozet_eksik_bolumde_cokmez():
     ozet = analizi_derle("X", sonuclar)["ozet"]
     assert ozet["pddd"] is None
     assert ozet["rsi_14"] is None
+
+
+def test_ozet_kart_cikttida_var():
+    """Ajan bu alani cevabin basina oldugu gibi ekliyor."""
+    sonuclar = _tam_sonuc()
+    sonuclar["oranlar"] = {"fiyat": 11.15, "pddd": 0.97, "temettu_verimi": 1.84}
+    sonuclar["teknik"] = {"rsi_14": 54.82}
+    kart = analizi_derle("X", sonuclar)["ozet_kart"]
+    assert "| Son fiyat | 11,15 TL |" in kart
+    assert "%1,84" in kart

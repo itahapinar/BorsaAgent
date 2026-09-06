@@ -100,3 +100,9 @@ def test_arac_rakamini_degistirmeme_kurali_var():
     metin = sistem_promptu()
     assert "0,2053" in metin
     assert "hafızandan" in metin
+
+
+def test_ozet_tabloyu_model_yazmasin_kurali_var():
+    """Kart kodda uretiliyor; model tekrar yazarsa cift tablo cikar."""
+    metin = sistem_promptu()
+    assert "ÖZET TABLOYU SEN YAZMA" in metin

@@ -34,8 +34,10 @@ def fk(fiyat_tl: float, hisse_adedi: int, net_kar_tl: float) -> float | None:
     return piyasa_degeri(fiyat_tl, hisse_adedi) / net_kar_tl
 
 
-def temettu_verimi(temettu_12ay_tl: float, fiyat_tl: float) -> float:
+def temettu_verimi(temettu_12ay_tl: float | None, fiyat_tl: float | None) -> float | None:
     """Son 12 ayda odenen temettunun fiyata orani (yuzde)."""
+    if temettu_12ay_tl is None or not fiyat_tl:
+        return None
     if fiyat_tl <= 0:
         raise ValueError("fiyat pozitif olmali")
     return temettu_12ay_tl / fiyat_tl * 100

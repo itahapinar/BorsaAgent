@@ -250,7 +250,9 @@ async def finansal_oranlar(kod: str) -> dict:
             "net_kar_tl": girdiler["net_kar_ttm"],
         },
         anlik["fiyat"],
-        toplu.get(kod.strip().upper(), {}).get("temettu_12ay", 0.0),
+        # Varsayilan 0.0 YOK: toplu indirme bos donunce "temettu odenmemis"
+        # gibi okunuyordu (olculdu, GENKM). Bilinmemek ile odenmemek ayri.
+        toplu.get(kod.strip().upper(), {}).get("temettu_12ay"),
         toplu.get(kod.strip().upper(), {}).get("ortalama_hacim_tl"),
     )
     satir.pop("guncelleme", None)
@@ -270,6 +272,11 @@ async def finansal_oranlar(kod: str) -> dict:
         satir["not"] = "Ozkaynak verisi bulunamadi; PD/DD hesaplanamadi."
     elif girdiler["net_kar_ttm"] is None:
         satir["not"] = "Son 12 ay kari hesaplanamadi; F/K verilemiyor."
+    elif satir.get("temettu_12ay") is None:
+        satir["not"] = (
+            "Temettu verisi alinamadi; tutar ve verim BILINMIYOR. "
+            "'Temettu odenmemis' DEME."
+        )
 
     # Makullük kontrolu. Coklu hisse sinifi olan sirketlerde odenmis sermaye
     # TUM siniflarin toplamidir ve tek sinifa atanamaz; ISATR'da PD/DD
@@ -437,7 +444,67 @@ ANALIZ_BOLUMLERI = (
 )
 
 
-OZET_ALANLARI = ("fiyat", "pddd", "fk", "temettu_12ay", "temettu_verimi")
+# Baslik rakamlari KODDA uretilir. Olculdu: arac temettu_12ay=0,2053 ve
+# verim %1,84'u dort ayri yerde (ozet, oranlar, temettu ve "0,00 DEME"
+# notu) donderken model cevaba "%0,0" yazdi. Prompt kurali, uyari notu ve
+# ozet blogu denendi; hicbiri tutmadi. Bu tablo modelden gecmez.
+KART_SATIRLARI = (
+    ("Son fiyat", "fiyat", "tl"),
+    ("Piyasa değeri", "piyasa_degeri", "tam_tl"),
+    ("PD/DD", "pddd", "oran"),
+    ("F/K", "fk", "fk"),
+    ("Temettü (12 ay)", "temettu_12ay", "temettu"),
+    ("Temettü verimi", "temettu_verimi", "yuzde"),
+    ("RSI (14)", "rsi_14", "oran"),
+    ("MACD", "macd", "dort"),
+)
+VERI_YOK = "veri yok"
+
+
+def _bicimle(deger, tur: str, ozet: dict) -> str:
+    if deger is None:
+        if tur == "fk":
+            net_kar = ozet.get("net_kar_tl")
+            if net_kar is not None and net_kar < 0:
+                return "tanımsız (net kâr negatif)"
+        return VERI_YOK
+    if tur == "tl":
+        return f"{_virgullu(deger, 2)} TL"
+    if tur == "tam_tl":
+        # Binlik ayirici nokta; bicim.py bunu "6,79 milyar TL" diye kisaltir.
+        return f"{deger:,.0f}".replace(",", ".") + " TL"
+    if tur == "temettu":
+        return f"{_virgullu(deger, 4)} TL"
+    if tur == "yuzde":
+        return f"%{_virgullu(deger, 2)}"
+    if tur == "dort":
+        return _virgullu(deger, 4)
+    return _virgullu(deger, 2)
+
+
+def ozet_kart(ozet: dict) -> str:
+    """Baslik rakamlarini markdown boru tablosu olarak uretir.
+
+    Model bu tabloyu yeniden yazmaz; ajan tarafi cevabin basina oldugu gibi
+    ekler ve bicim.py hizali monospace bloga cevirir.
+    """
+    if not ozet:
+        return ""
+    return "\n".join(
+        f"| {etiket} | {_bicimle(ozet.get(alan), tur, ozet)} |"
+        for etiket, alan, tur in KART_SATIRLARI
+    )
+
+
+OZET_ALANLARI = (
+    "fiyat",
+    "piyasa_degeri",
+    "pddd",
+    "fk",
+    "net_kar_tl",
+    "temettu_12ay",
+    "temettu_verimi",
+)
 
 
 def _ozet_cikar(oranlar, teknik) -> dict:
@@ -465,9 +532,13 @@ def analizi_derle(kod: str, sonuclar: dict) -> dict:
         return None if (s is None or isinstance(s, BaseException)
                         or (isinstance(s, dict) and "hata" in s)) else s
 
+    ozet = _ozet_cikar(_gecerli("oranlar"), _gecerli("teknik"))
     derlenen: dict = {
         "kod": kod.upper(),
-        "ozet": _ozet_cikar(_gecerli("oranlar"), _gecerli("teknik")),
+        "ozet": ozet,
+        # Ajan bu tabloyu cevabin basina OLDUGU GIBI ekler; rakamlar
+        # modelden gecmez (bkz. ozet_kart).
+        "ozet_kart": ozet_kart(ozet),
     }
     eksik: list[str] = []
 

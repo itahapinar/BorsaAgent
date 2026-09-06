@@ -22,6 +22,24 @@ TAVAN_MESAJI = (
 )
 
 
+# Arac sonucunda bu alan varsa icerigi cevabin basina OLDUGU GIBI eklenir.
+# Olculdu: model dogru rakami dort ayri yerde gormesine ragmen temettu
+# verimini "%0,0" yaziyordu; prompt kurali, uyari notu ve ozet blogu
+# tutmadi. Baslik rakamlari artik modelden gecmiyor. Kural GENEL: ajan
+# aracin ne yaptigini bilmez, yalnizca bu alan adini bilir.
+OZET_KART_ALANI = "ozet_kart"
+
+
+def kart_ayikla(sonuc_metni: str) -> str | None:
+    """Arac sonucundan ozet kartini cikarir; JSON degilse None doner."""
+    try:
+        veri = json.loads(sonuc_metni)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    kart = veri.get(OZET_KART_ALANI) if isinstance(veri, dict) else None
+    return kart.strip() if isinstance(kart, str) and kart.strip() else None
+
+
 class Ajan:
     def __init__(
         self, ayarlar: Ayarlar, mcp, hafiza: Hafiza, tur_tavani: int = TUR_TAVANI
@@ -66,8 +84,13 @@ class Ajan:
 
         return list(await asyncio.gather(*(_bir(c) for c in cagrilar)))
 
+    def _kartla(self, kartlar: list[str], cevap: str) -> str:
+        """Kart(lar)i cevabin basina koyar; rakamlar modelden gecmez."""
+        return "\n\n".join([*kartlar, cevap]) if kartlar else cevap
+
     async def cevapla(self, soru: str) -> str:
         self._hafiza.ekle("user", soru)
+        kartlar: list[str] = []
 
         araclar = await self._mcp.arac_semalari()
         mesajlar = [{"role": "system", "content": sistem_promptu()}, *self._hafiza.gecmis()]
@@ -84,7 +107,7 @@ class Ajan:
             if not getattr(mesaj, "tool_calls", None):
                 cevap = (mesaj.content or "").strip() or "Cevap uretemedim."
                 self._hafiza.ekle("assistant", cevap)
-                return cevap
+                return self._kartla(kartlar, cevap)
 
             # Govde ve sonuclar BIRLIKTE kaydedilir. Sonraki turda tool
             # mesaji tool_call_id'siz giderse uc nokta 400 veriyor; govdesi
@@ -99,6 +122,9 @@ class Ajan:
             mesajlar.extend(sonuclar)
             for sonuc in sonuclar:
                 self._hafiza.arac_sonucu_ekle(sonuc["tool_call_id"], sonuc["content"])
+                kart = kart_ayikla(sonuc["content"])
+                if kart and kart not in kartlar:
+                    kartlar.append(kart)
 
             kayit.info("Tur %d: %d arac calistirildi", tur + 1, len(sonuclar))
 
@@ -112,4 +138,4 @@ class Ajan:
             "Bu soru icin gereken veriyi toplayamadim."
         )
         self._hafiza.ekle("assistant", cevap)
-        return cevap
+        return self._kartla(kartlar, cevap)
