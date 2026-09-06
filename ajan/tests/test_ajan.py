@@ -242,3 +242,27 @@ async def test_bozuk_json_sonucta_cokmez(tmp_path):
 
     llm = SahteLLM(_fiyat_turu(cevap="veri alinamadi"))
     assert await _ajan(tmp_path, llm, BozukMcp()).cevapla("X") == "veri alinamadi"
+
+
+async def test_dusuk_sicaklikla_cagriliyor(tmp_path):
+    """Olculdu: model cumle ortasinda dil degistiriyor (Korece, Japonca,
+    Arapca, Cince kelimeler). Rastgele jeton secimi bunun basli sebebi;
+    varsayilan sicaklikla birakilmisti."""
+    from ajan.ajan import SICAKLIK
+
+    llm = SahteLLM([SahteYanit([SahteSecim(SahteMesaj(content="ok"))])])
+    await _ajan(tmp_path, llm).cevapla("soru")
+    assert llm.istekler[0]["temperature"] == SICAKLIK
+    assert SICAKLIK <= 0.4, "dil karismasi icin dusuk tutulmali"
+
+
+async def test_tur_tavani_cagrisi_da_dusuk_sicaklikli(tmp_path):
+    from ajan.ajan import SICAKLIK
+
+    sonsuz = [
+        SahteYanit([SahteSecim(SahteMesaj(tool_calls=[SahteCagri("anlik_fiyat", "{}")]))])
+        for _ in range(10)
+    ]
+    llm = SahteLLM(sonsuz)
+    await _ajan(tmp_path, llm).cevapla("dongu")
+    assert llm.istekler[-1]["temperature"] == SICAKLIK

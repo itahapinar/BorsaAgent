@@ -17,6 +17,11 @@ from ajan.prompt import sistem_promptu
 kayit = logging.getLogger(__name__)
 
 TUR_TAVANI = 5
+# Olculdu (canli bot): model cumle ortasinda dil degistiriyor -- "toparlama
+# 가능성을 gosterirken", "destekㅕnu", ayrica ブランド, نسبي, 压力. Rastgele
+# jeton secimi bunun basli sebebi. Yaratici metin yazmiyoruz; finansal veri
+# aktariyoruz, dusuk sicaklik dogru secim.
+SICAKLIK = 0.3
 TAVAN_MESAJI = (
     "Bu soru icin gereken veriyi tam toplayamadim. Elimdekiyle cevaplayayim: "
 )
@@ -101,6 +106,7 @@ class Ajan:
                 messages=mesajlar,
                 tools=araclar,
                 tool_choice="auto",
+                temperature=SICAKLIK,
             )
             mesaj = yanit.choices[0].message
 
@@ -133,6 +139,7 @@ class Ajan:
         son = await self._llm_cagir(
             model=self._ayarlar.nvidia_model,
             messages=[*mesajlar, {"role": "user", "content": TAVAN_MESAJI}],
+            temperature=SICAKLIK,
         )
         cevap = (son.choices[0].message.content or "").strip() or (
             "Bu soru icin gereken veriyi toplayamadim."

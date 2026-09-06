@@ -132,6 +132,33 @@ def _ham_tutarlari_kisalt(metin: str) -> str:
     return HAM_TUTAR.sub(cevir, metin)
 
 
+# Markdown basligi Telegram'da render edilmiyor, "### KAP" ham dusuyordu.
+BASLIK = re.compile(r"^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$", re.M)
+
+# Model cumle ortasinda dil degistiriyor: olculdu "toparlama 가능성을
+# gosterirken", "destekㅕnu", ayrica ブランド (Japonca), نسبي (Arapca),
+# 压力 (Cince). Bunlar anlam tasimayan sizinti; iceren KELIME atilir --
+# harfi tek basina silmek "destek nu" gibi bozuk bir kelime birakiyordu.
+YABANCI_HARF = (
+    "\u0600-\u06ff"  # Arapca
+    "\u0400-\u04ff"  # Kiril
+    "\u0900-\u097f"  # Devanagari
+    "\u1100-\u11ff\u3130-\u318f\uac00-\ud7af"  # Hangul
+    "\u3040-\u30ff"  # Hiragana/Katakana
+    "\u3400-\u4dbf\u4e00-\u9fff"  # Han
+)
+YABANCI_KELIME = re.compile(rf"\S*[{YABANCI_HARF}]\S*")
+
+
+def yabanci_yaziyi_temizle(metin: str) -> str:
+    """Turkce olmayan alfabelerden sizan kelimeleri atar."""
+    if not YABANCI_KELIME.search(metin):
+        return metin
+    temiz = YABANCI_KELIME.sub("", metin)
+    # Kelime atilinca cift bosluk kaliyor; satir yapisi korunur.
+    return re.sub(r"[^\S\n]{2,}", " ", temiz).replace(" \n", "\n")
+
+
 def _kacir(metin: str) -> str:
     return metin.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -250,11 +277,13 @@ def telegram_html(metin: str) -> str:
     entities" ile reddediyor.
     """
     metin = metin.translate(OZEL_BOSLUKLAR)
+    metin = yabanci_yaziyi_temizle(metin)
     metin = YATAY_CIZGI.sub("", metin)
     metin = _binlik_ayiriciyi_duzelt(metin)
     metin = _ham_tutarlari_kisalt(metin)
     govde, tablolar = _tablolari_ayikla(metin)
     govde = _kacir(govde)
+    govde = BASLIK.sub(r"<b>\1</b>", govde)
     govde = KALIN.sub(r"<b>\1</b>", govde)
     govde = KOD.sub(r"<code>\1</code>", govde)
 

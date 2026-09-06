@@ -252,3 +252,52 @@ def test_birimsiz_buyuk_sayilar_da_kisaltilir():
     sonuc = telegram_html("| Kalem | 2025 |\n|---|---|\n| Varlıklar | 2.351.336.385.167 |")
     assert "2,35 trilyon" in sonuc
     assert "2,35 trilyon TL" not in sonuc, "olmayan birim uydurulmamali"
+
+
+# --- Baslik ve yabanci alfabe ----------------------------------------------
+# Olculdu (canli bot): "### 📰 KAP" ham metin olarak dustu -- Telegram
+# markdown basligi render etmiyor. Ayrica model cumle ortasinda dil
+# degistiriyor: "toparlama 가능성을 gosterirken", "destekㅕnu", daha once de
+# Japonca (ブランド), Arapca (نسبي) ve Cince (压力) gorulmustu.
+
+
+def test_markdown_basligi_kalin_olur():
+    sonuc = telegram_html("### 📰 KAP (Son 90 gün)\nmetin")
+    assert "<b>📰 KAP (Son 90 gün)</b>" in sonuc
+    assert "###" not in sonuc
+
+
+def test_farkli_seviyedeki_basliklar_da_cevrilir():
+    for isaret in ("#", "##", "####"):
+        assert "<b>Başlık</b>" in telegram_html(f"{isaret} Başlık")
+
+
+def test_korece_kelime_temizlenir():
+    sonuc = telegram_html("kısa vadeli bir toparlama 가능성을 gösterirken")
+    assert "가능성을" not in sonuc
+    assert "toparlama" in sonuc and "gösterirken" in sonuc
+
+
+def test_cince_japonca_arapca_temizlenir():
+    for yabanci in ("压力", "ブランド", "نسبي"):
+        sonuc = telegram_html(f"sektörde {yabanci} etkisi var")
+        assert yabanci not in sonuc
+        assert "sektörde" in sonuc and "etkisi" in sonuc
+
+
+def test_kelime_icine_karisan_harf_kelimeyi_dusurur():
+    """"destekㅕnu" gibi bozulmus kelime metinde kalmamali."""
+    sonuc = telegram_html("Bu seviyenin altında destekㅕnu kaybedebilir")
+    assert "ㅕ" not in sonuc
+    assert "seviyenin" in sonuc and "kaybedebilir" in sonuc
+
+
+def test_turkce_harfler_ve_emoji_korunur():
+    metin = "Şirketin özkaynağı 1,07 trilyon TL 💵 ğüşiöç ÄÖÜ"
+    sonuc = telegram_html(metin)
+    for parca in ("Şirketin", "özkaynağı", "💵", "ğüşiöç", "ÄÖÜ"):
+        assert parca in sonuc
+
+
+def test_temizlik_bosluklari_bozmaz():
+    assert telegram_html("bir 가능성 iki") == "bir iki"
