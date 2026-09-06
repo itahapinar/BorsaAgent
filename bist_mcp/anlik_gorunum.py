@@ -14,7 +14,11 @@ import time
 from pathlib import Path
 
 from bist_mcp.hesap import fk, pddd, piyasa_degeri, temettu_verimi
-from bist_mcp.kaynaklar.isyatirim import NET_KAR_ADLARI, OZKAYNAK_ADLARI  # noqa: F401
+from bist_mcp.kaynaklar.isyatirim import (  # noqa: F401
+    NET_KAR_ADLARI,
+    OZKAYNAK_ADLARI,
+    hisse_adedi_sec,
+)
 
 SUTUNLAR = (
     "kod",
@@ -195,7 +199,10 @@ class AnlikGorunum:
                         "kod": kod,
                         "unvan": sirket.unvan if sirket else None,
                         "sektor": bilgi.get("sector"),
-                        "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
+                        "hisse_adedi": hisse_adedi_sec(
+                            girdiler.get("odenmis_sermaye"),
+                            bilgi.get("sharesOutstanding"),
+                        ) or 0,
                         # Ozkaynak STOK -> guncel bilanco; net kar AKIS -> TTM
                         "ozkaynak_tl": girdiler["ozkaynak_tl"],
                         "net_kar_tl": girdiler["net_kar_ttm"],

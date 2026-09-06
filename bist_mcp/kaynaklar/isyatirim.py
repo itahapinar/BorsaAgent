@@ -209,6 +209,36 @@ AZINLIK_KAR_ADLARI = (
 )
 
 
+# BIST'te nominal deger neredeyse her zaman 1 TL, yani odenmis sermaye =
+# hisse adedi. Turk kaynaklari orani bundan hesapliyor. yfinance'in
+# sharesOutstanding'i geri alinmis paylari dusuyor ve dusuk kaliyor:
+#   AHGAZ  yfinance 2.528.516.915 / odenmis 2.600.000.000 = 0,973
+#   THYAO  yfinance 1.372.283.353 / odenmis 1.380.000.000 = 0,994
+# AHGAZ'daki %2,7 fark, olculen oran sapmasiyla birebir ortusuyordu.
+ODENMIS_SERMAYE_ADLARI = (
+    "Ödenmiş Sermaye",
+    "A- Ödenmiş Sermaye",
+    "I. ÖDENMİŞ SERMAYE",
+    "Ödenmiş sermaye",
+)
+# Nominali 1 TL olmayan bir sirkette odenmis sermaye hisse adedi DEGILDIR.
+# Boyle bir durumda 100 kat sapmamak icin yfinance ile karsilastirilip
+# makul araligin disindaysa reddedilir.
+MAKUL_HISSE_ORANI = (0.5, 2.0)
+
+
+def hisse_adedi_sec(odenmis_sermaye: float | None, yfinance_adet: int | None) -> int | None:
+    """Hisse adedini secer: odenmis sermaye tercih, makul degilse yfinance."""
+    if odenmis_sermaye and yfinance_adet:
+        oran = odenmis_sermaye / yfinance_adet
+        if MAKUL_HISSE_ORANI[0] <= oran <= MAKUL_HISSE_ORANI[1]:
+            return int(odenmis_sermaye)
+        return int(yfinance_adet)
+    if odenmis_sermaye:
+        return int(odenmis_sermaye)
+    return int(yfinance_adet) if yfinance_adet else None
+
+
 def _bolumde_bul(kalemler: list[dict], adaylar: tuple[str, ...]) -> float | None:
     """Yalnizca verilen bolum icinde arar.
 
@@ -408,6 +438,9 @@ class IsYatirimIstemci:
 
             if ozkaynak is not None or net_kar is not None:
                 return {
+                    "odenmis_sermaye": _bolumde_bul(
+                        bolumler["bilanco"], ODENMIS_SERMAYE_ADLARI
+                    ),
                     "ozkaynak_tl": ozkaynak,
                     "ozkaynak_donem": donem_etiketi(yil, ay, "ceyreklik" if ay != 12 else "yillik"),
                     "net_kar_ttm": net_kar,
@@ -417,6 +450,7 @@ class IsYatirimIstemci:
                 }
 
         return {
+            "odenmis_sermaye": None,
             "ozkaynak_tl": None,
             "ozkaynak_donem": None,
             "net_kar_ttm": None,

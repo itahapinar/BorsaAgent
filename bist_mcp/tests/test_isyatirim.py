@@ -15,6 +15,7 @@ from bist_mcp.kaynaklar.isyatirim import (
     ANA_KAR_ADLARI,
     AZINLIK_KAR_ADLARI,
     ana_ortaklik_payi,
+    hisse_adedi_sec,
     guncel_donem_sec,
     sifir_satirlari_at,
     tablo_bol,
@@ -350,3 +351,25 @@ def test_ana_ortaklik_toplamdan_kucuk_olmali():
         AHGAZ_BILANCO, OZKAYNAK_ADLARI, ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI
     )
     assert ana < toplam, "ana ortaklik payi konsolide toplami asamaz"
+
+
+# --- Hisse adedi: odenmis sermaye vs yfinance ---
+# Olculdu: yfinance geri alinmis paylari dusuyor ve dusuk kaliyor.
+#   AHGAZ 2.528.516.915 / 2.600.000.000 = 0,973  -> orani %2,7 saptiriyordu
+
+
+def test_odenmis_sermaye_tercih_edilir():
+    assert hisse_adedi_sec(2_600_000_000, 2_528_516_915) == 2_600_000_000
+
+
+def test_makul_olmayan_oranda_yfinance_kullanilir():
+    """Nominali 1 TL olmayan sirkette odenmis sermaye hisse adedi DEGILDIR;
+    100 kat sapmamak icin reddedilir."""
+    assert hisse_adedi_sec(100_000_000, 1_000_000_000) == 1_000_000_000
+    assert hisse_adedi_sec(10_000_000_000, 1_000_000_000) == 1_000_000_000
+
+
+def test_tek_kaynak_varsa_o_kullanilir():
+    assert hisse_adedi_sec(500, None) == 500
+    assert hisse_adedi_sec(None, 700) == 700
+    assert hisse_adedi_sec(None, None) is None

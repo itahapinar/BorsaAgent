@@ -19,7 +19,7 @@ from mcp.server.fastmcp import FastMCP
 from bist_mcp.anlik_gorunum import AnlikGorunum, satir_hesapla
 from bist_mcp.evren import tarama_evreni
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
-from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, tablo_bol
+from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, hisse_adedi_sec, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
 from bist_mcp.kaynaklar.kur import KurKaynak
 from bist_mcp.kaynaklar.tcmb import TcmbIstemci
@@ -222,7 +222,9 @@ async def finansal_oranlar(kod: str) -> dict:
             "kod": kod.upper(),
             "unvan": sirket.unvan if sirket else None,
             "sektor": bilgi.get("sector"),
-            "hisse_adedi": bilgi.get("sharesOutstanding") or 0,
+            "hisse_adedi": hisse_adedi_sec(
+                girdiler.get("odenmis_sermaye"), bilgi.get("sharesOutstanding")
+            ) or 0,
             # Ozkaynak STOK -> guncel bilanco; net kar AKIS -> son 12 ay
             "ozkaynak_tl": girdiler["ozkaynak_tl"],
             "net_kar_tl": girdiler["net_kar_ttm"],
