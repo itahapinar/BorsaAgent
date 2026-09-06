@@ -32,8 +32,26 @@ KOK = Path(__file__).resolve().parent.parent
 
 # Tool calling destekleyen model ailelerinin kimliklerinde gecen parcalar.
 ADAY_ISARETLERI = ("nemotron", "glm", "kimi", "llama-3.1", "llama-4", "qwen", "mixtral")
-# Uretim/gomme/gorsel modelleri elenir.
-HARIC_ISARETLER = ("embed", "rerank", "sdxl", "stable", "diffusion", "vision", "ocr", "tts", "asr")
+# Uretim/gomme/gorsel modelleri elenir. Ilk kosuda olculdu: guvenlik
+# siniflandiricilari ("Tool use has not been enabled, because it is
+# unsupported by ..."), odul modelleri, belge ayristiricilar ve instruct
+# olmayan temel modeller aday suzgecinden geciyor ve 20 soruluk bir kosuyu
+# bosa harciyordu.
+HARIC_ISARETLER = (
+    "embed", "rerank", "sdxl", "stable", "diffusion", "vision", "ocr", "tts", "asr",
+    "guard", "safety", "reward", "parse", "topic-control", "-v0.1",
+)
+
+# Tek istek bu sureyi asarsa kesilir. Ilk kosuda kimi-k3 cagri basina
+# ortalama 232 sn surdu ve tek model 20 soruda ~77 dakika yedi; o gecikme
+# bir Telegram botu icin zaten kullanilamaz.
+ISTEK_ZAMAN_ASIMI = 30.0
+# Ilk sorularin hepsi altyapi hatasiyla dustuyse model arac cagirmayi
+# desteklemiyordur; kalan 17 soruyu denemenin anlami yok.
+ERKEN_BIRAK = 3
+# Erken birakma ucuzlattigi icin ilk kosudaki 5 yerine daha genis bakiliyor;
+ilk kosuda guclu nemotron modellerinin hicbiri siraya girmemisti.
+DENENECEK_SAYISI = 8
 
 SORULAR: list[tuple[str, str]] = [
     ("THYAO kaç TL?", "anlik_fiyat"),
@@ -59,14 +77,22 @@ SORULAR: list[tuple[str, str]] = [
 ]
 
 
-def aday_modelleri_sec(kimlikler: list[str]) -> list[str]:
-    """Katalogdan tool calling'e uygun adaylari suzer."""
-    return [
+def aday_modelleri_sec(kimlikler: list[str], mevcut: str | None = None) -> list[str]:
+    """Katalogdan tool calling'e uygun adaylari suzer.
+
+    `mevcut` (.env'deki model) her zaman basa alinir: olculmeden kalirsa
+    karsilastirmanin anlami olmaz. Ilk kosuda tam bu oldu -- varsayilan
+    model listenin ilk besine girmedigi icin hic denenmedi.
+    """
+    adaylar = [
         kimlik
         for kimlik in kimlikler
         if any(i in kimlik.lower() for i in ADAY_ISARETLERI)
         and not any(h in kimlik.lower() for h in HARIC_ISARETLER)
     ]
+    if mevcut:
+        adaylar = [mevcut] + [k for k in adaylar if k != mevcut]
+    return adaylar
 
 
 def isabet_hesapla(sonuclar: list[bool]) -> float:
@@ -86,6 +112,7 @@ async def _bir_soruyu_dene(istemci, model: str, araclar, soru: str) -> tuple[str
         ],
         tools=araclar,
         tool_choice="auto",
+        timeout=ISTEK_ZAMAN_ASIMI,
     )
     gecikme = time.time() - basla
     cagrilar = getattr(yanit.choices[0].message, "tool_calls", None)
@@ -93,17 +120,37 @@ async def _bir_soruyu_dene(istemci, model: str, araclar, soru: str) -> tuple[str
 
 
 async def _modeli_olc(istemci, model: str, araclar) -> dict:
+    """20 soruyu sorar. Altyapi hatasi ile yanlis arac secimi AYRI sayilir.
+
+    Ilk kosuda mistral-nemotron cagrilarin cogunda HTTP 500 aldi ve sonuc
+    "modelin isabeti %10" gibi okundu; oysa olculen sey modelin degil
+    servisin durumuydu. Ilk ERKEN_BIRAK soru hep hata verirse model arac
+    cagirmayi desteklemiyordur ve kalan sorular denenmez -- ilk kosuda
+    desteklemeyen bir model 20 soruyu bosa harcamisti.
+    """
     dogrular: list[bool] = []
     gecikmeler: list[float] = []
     yanlislar: list[str] = []
+    hatalar: list[str] = []
 
-    for soru, beklenen in SORULAR:
+    for sira, (soru, beklenen) in enumerate(SORULAR, start=1):
         try:
             secilen, gecikme = await _bir_soruyu_dene(istemci, model, araclar, soru)
         except Exception as hata:  # noqa: BLE001
             kayit.warning("%s -> %s: %s", model, soru, hata)
             dogrular.append(False)
-            yanlislar.append(f"{soru} -> HATA")
+            hatalar.append(f"{soru} -> {type(hata).__name__}")
+            if sira == ERKEN_BIRAK and len(hatalar) == ERKEN_BIRAK:
+                kayit.warning("%s ilk %d soruda hata verdi, atlaniyor", model, ERKEN_BIRAK)
+                return {
+                    "model": model,
+                    "isabet": 0.0,
+                    "dogru": 0,
+                    "ortalama_gecikme": None,
+                    "yanlislar": [],
+                    "hatalar": hatalar,
+                    "atlandi": True,
+                }
             continue
 
         dogrular.append(secilen == beklenen)
@@ -117,6 +164,8 @@ async def _modeli_olc(istemci, model: str, araclar) -> dict:
         "dogru": sum(dogrular),
         "ortalama_gecikme": round(sum(gecikmeler) / len(gecikmeler), 2) if gecikmeler else None,
         "yanlislar": yanlislar,
+        "hatalar": hatalar,
+        "atlandi": False,
     }
 
 
@@ -133,17 +182,21 @@ async def main() -> None:
     try:
         araclar = await mcp.arac_semalari()
         katalog = await istemci.models.list()
-        adaylar = aday_modelleri_sec([m.id for m in katalog.data])
+        adaylar = aday_modelleri_sec(
+            [m.id for m in katalog.data], mevcut=ayarlar.nvidia_model or None
+        )
         print(f"Katalogda {len(katalog.data)} model, {len(adaylar)} aday bulundu.\n")
 
         sonuclar = []
-        for model in adaylar[:5]:
+        for model in adaylar[:DENENECEK_SAYISI]:
             print(f"--- {model} olculuyor ({len(SORULAR)} soru) ---")
             sonuc = await _modeli_olc(istemci, model, araclar)
             sonuclar.append(sonuc)
             print(
                 f"    isabet {sonuc['dogru']}/{len(SORULAR)} (%{sonuc['isabet']}) "
                 f"| ort. gecikme {sonuc['ortalama_gecikme']} sn"
+                + (f" | {len(sonuc['hatalar'])} altyapi hatasi" if sonuc["hatalar"] else "")
+                + (" (erken birakildi)" if sonuc.get("atlandi") else "")
             )
 
         sonuclar.sort(key=lambda s: (-s["isabet"], s["ortalama_gecikme"] or 999))
@@ -160,6 +213,13 @@ async def main() -> None:
             print(f"\n.env dosyana yaz:  NVIDIA_MODEL={kazanan['model']}")
             if kazanan["isabet"] < 90:
                 print("UYARI: hedef %90 (18/20). Once modeli sorgula, arac aciklamalarini degil.")
+            gecikme = kazanan["ortalama_gecikme"] or 0
+            if gecikme > 10:
+                print(
+                    f"UYARI: ortalama gecikme {gecikme} sn. Telegram'da her soru en az"
+                    " bu kadar bekletir; isabeti biraz dusuk ama hizli bir modeli"
+                    " tercih etmek daha iyi olabilir."
+                )
 
         (KOK / "model_karsilastirma.json").write_text(
             json.dumps(sonuclar, ensure_ascii=False, indent=2), encoding="utf-8"
