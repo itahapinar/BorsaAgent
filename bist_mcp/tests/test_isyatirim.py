@@ -8,6 +8,8 @@ from bist_mcp.kaynaklar.isyatirim import (
     kalem_bul,
     sayiya_cevir,
     net_kar_ttm,
+    OZKAYNAK_ADLARI,
+    NET_KAR_ADLARI,
     guncel_donem_sec,
     sifir_satirlari_at,
     tablo_bol,
@@ -243,3 +245,39 @@ def test_guncel_donem_en_yeni_dolu_olani_secer():
 
 def test_guncel_donem_bos_sozlukte_none():
     assert guncel_donem_sec({}) is None
+
+
+# --- Sirket tipine gore kalem adlari (4 ayri hesap plani) ---
+
+
+def test_dort_hesap_planinin_ozkaynak_adi_taniniyor():
+    """Tum evren tarandi (630 hisse); bu adlar olmadan koca kategoriler
+    tamamen bos donuyordu:
+      sigorta        -> ANSGR, TURSG      ("Özsermaye Toplamı")
+      katilim bankasi-> ALBRK             ("ÖZKAYNAK", tekil)
+    """
+    for ad in ("Özkaynaklar", "XVI. ÖZKAYNAKLAR", "Özsermaye Toplamı", "ÖZKAYNAK"):
+        assert ad in OZKAYNAK_ADLARI, f"{ad} eksik"
+
+
+def test_dort_hesap_planinin_net_kar_adi_taniniyor():
+    for ad in (
+        "DÖNEM KARI (ZARARI)",
+        "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
+        "XVIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
+        "F-Dönem Net Karı",
+    ):
+        assert ad in NET_KAR_ADLARI, f"{ad} eksik"
+
+
+def test_katilim_bankasi_roma_rakami_bankadan_farkli():
+    """ALBRK XVIII kullaniyor, GARAN XXIII. Ikisi de listede olmali."""
+    banka = "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)"
+    katilim = "XVIII. NET DÖNEM KARI/ZARARI (XVII+XXII)"
+    assert banka != katilim
+    assert banka in NET_KAR_ADLARI and katilim in NET_KAR_ADLARI
+
+
+def test_kalem_bul_sigorta_adini_bulur():
+    kalemler = [{"ad": "Özsermaye Toplamı", "degerler": [40_045_701_921.0]}]
+    assert kalem_bul(kalemler, *OZKAYNAK_ADLARI) == 40_045_701_921.0

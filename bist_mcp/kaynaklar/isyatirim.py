@@ -151,13 +151,32 @@ def tablo_bol(kalemler: list[dict]) -> dict[str, list[dict]]:
     }
 
 
-# Sanayi ve banka (BDDK) tablolarinda ayni kavramin farkli adlari.
-# Burada tanimli cunku kaynagin bicimine ait bir bilgi.
-OZKAYNAK_ADLARI = ("XVI. ÖZKAYNAKLAR", "Özkaynaklar")
+# Ayni kavramin sirket tipine gore farkli adlari. Uc ayri hesap plani var:
+#   sanayi/ticaret -> "Özkaynaklar" / "DÖNEM KARI (ZARARI)"
+#   banka (BDDK)   -> "XVI. ÖZKAYNAKLAR" / "XXIII. NET DÖNEM KARI/ZARARI"
+#   sigorta        -> "Özsermaye Toplamı" / "F-Dönem Net Karı"
+#   katilim bankasi-> "ÖZKAYNAK" (tekil) / "XVIII. NET DÖNEM KARI/ZARARI"
+#
+# Tum evren tarandi (630 islem goren hisse): bu adlarla 609'u cozuluyor.
+# Kalan 21'inin Is Yatirim'da hic finansal tablosu yok (cogu faktoring ve
+# finansal kiralama: GARFA, VAKFA, ISFIN, QNBFK...) - bu bizim eksigimiz
+# degil, kaynakta veri yok.
+OZKAYNAK_ADLARI = (
+    "XVI. ÖZKAYNAKLAR",
+    "Özkaynaklar",
+    "Özsermaye Toplamı",
+    "ÖZSERMAYE TOPLAMI",
+    "ÖZKAYNAK",
+    "Ana Ortaklığa Ait Özkaynaklar",
+)
 NET_KAR_ADLARI = (
     "XXIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
     "DÖNEM KARI (ZARARI)",
     "Dönem Karı (Zararı)",
+    "XVIII. NET DÖNEM KARI/ZARARI (XVII+XXII)",
+    "F-Dönem Net Karı",
+    "N- Dönem Net Karı veya Zararı",
+    "Dönem Net Karı",
 )
 
 

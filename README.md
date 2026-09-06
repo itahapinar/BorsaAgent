@@ -19,7 +19,7 @@ Copy-Item .env.example .env    # sonra .env'i doldur — GERÇEK ANAHTARLAR .env
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
-python -m pytest bist_mcp/              # 98 hızlı test, ağ yok
+python -m pytest bist_mcp/              # 109 hızlı test, ağ yok
 python -m pytest bist_mcp/ -m network   # 11 canlı test, ~10 sn
 ```
 
@@ -88,36 +88,55 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    İkisini de yıllık almak her hisseyi etkiliyordu; şirket büyüdükçe PD/DD
    şişiyor, kâr daraldıkça F/K olduğundan düşük görünüyordu.
 
-3. **İş Yatırım MaliTablo TAM 4 DÖNEM istiyor.** 2 ya da 3 dönemle istek
+3. **Şirket tipine göre DÖRT ayrı hesap planı var.** Aynı kavramın adı değişiyor:
+
+   | Tip | Özkaynak | Net kâr |
+   |---|---|---|
+   | Sanayi/ticaret | `Özkaynaklar` | `DÖNEM KARI (ZARARI)` |
+   | Banka (BDDK) | `XVI. ÖZKAYNAKLAR` | `XXIII. NET DÖNEM KARI/ZARARI` |
+   | Sigorta | `Özsermaye Toplamı` | `F-Dönem Net Karı` |
+   | Katılım bankası | `ÖZKAYNAK` (tekil) | `XVIII. NET DÖNEM KARI/ZARARI` |
+
+   Katılım bankasının Roma rakamı bankadan farklı (XVIII vs XXIII) — kolayca
+   gözden kaçıyor. Sigorta ve katılım adları eklenmeden ANSGR, TURSG, ALBRK
+   gibi hisselerde oranlar **tamamen boş** dönüyordu.
+
+   Tüm evren tarandı: 630 işlem gören hissenin **609'u** çözülüyor. Kalan
+   21'inin İş Yatırım'da hiç finansal tablosu yok (çoğu faktoring ve finansal
+   kiralama: GARFA, VAKFA, ISFIN, QNBFK…). Bu bizim eksiğimiz değil, kaynakta
+   veri yok — `finansal_oranlar` bu durumu açıkça belirtiyor ki model "0" ya
+   da "düşük" diye sunmasın.
+
+4. **İş Yatırım MaliTablo TAM 4 DÖNEM istiyor.** 2 ya da 3 dönemle istek
    hata vermiyor, sessizce **boş liste** dönüyor. `_getir` eksik pencereyi
    otomatik dolduruyor ki hiçbir çağıran bu tuzağa düşmesin.
 
-4. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
+5. **KAP OID'si toplu şirket listesinden çözülür.** `member/filter` bir
    **isim aramasıdır**: `member/filter/GARAN` sekiz sonuç döndürüyor ve ilki
    "GARANTİ BBVA OPERASYONEL KİRALAMA"; doğru banka sekizinci sırada.
 
-5. **`stockCode` virgüllü çoklu kod tutar** (`"GARAN, TGB"`). Bölünmeden
+6. **`stockCode` virgüllü çoklu kod tutar** (`"GARAN, TGB"`). Bölünmeden
    eşleştirilirse GARAN, YKBNK, VAKBN, HALKB, ISCTR kaybolur.
    757 şirket → **807 ticker**.
 
-6. **Dönem takvimle hesaplanamaz.** 2026-09-05'te `2026/12` ve `2026/9` boş
+7. **Dönem takvimle hesaplanamaz.** 2026-09-05'te `2026/12` ve `2026/9` boş
    döner (henüz yayımlanmadı). Aday dönemler istenir, tamamen boş slotlar
    atılır. Değerler satır bazında değil **slot bazında** hizalanır.
 
-7. **İş Yatırım değerleri STRING döner** (`'1073081134047'`). Çevrilmezse
+8. **İş Yatırım değerleri STRING döner** (`'1073081134047'`). Çevrilmezse
    oran hesabı bölemez ve `'0' != 0` olduğu için sıfır satırları atılmaz.
 
-8. **Bilanço/gelir/nakit tek listede gelir**, ayrı tablolar halinde değil.
+9. **Bilanço/gelir/nakit tek listede gelir**, ayrı tablolar halinde değil.
    Bölme işaretleri: `TOPLAM KAYNAKLAR` (sanayi) / `PASİF TOPLAMI` (banka)
    bilançonun sonu, `İşletme Faaliyetlerinden Kaynaklanan Net Nakit` nakit
    akışının başı. **Bankalarda nakit akış tablosu yoktur.**
 
-9. **Hız sınırlayıcı kilitli olmalı.** Kilitsiz sürüm eşzamanlılıkta hiç
+10. **Hız sınırlayıcı kilitli olmalı.** Kilitsiz sürüm eşzamanlılıkta hiç
    sınırlamıyordu: ölçüldü, 20 eşzamanlı istek 2 istek/sn yerine 0,50 sn'de
    ateşliyordu. 630 hisselik kurulumda bu, kaynak siteye yüzlerce eşzamanlı
    istek demekti. `hiz_sinir.HizSinirlayici` bekleme ve damgayı atomik yapar.
 
-10. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
+11. **Tarama evreni BIST geneli**, elle yazılmış bir liste değil. KAP dizini
    807 ticker veriyor, 630'unda fiyat verisi var; kalanı işlem görmeyen ya da
    GARAN'ın `TGB`'si gibi ikincil kodlar ve toplu indirmede kendiliğinden
    düşüyor.

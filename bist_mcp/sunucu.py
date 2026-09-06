@@ -234,6 +234,20 @@ async def finansal_oranlar(kod: str) -> dict:
     satir.pop("guncelleme", None)
     satir["ozkaynak_donemi"] = girdiler["ozkaynak_donem"]
     satir["net_kar_donemi"] = girdiler["net_kar_aciklama"]
+
+    # Kaynakta finansal tablosu olmayan hisseler var (olculdu: 630 islem
+    # goren hissenin 21'i, cogu faktoring ve finansal kiralama). Sessizce
+    # bos oran dondurmek "sifir" gibi okunabilir; durumu acikca soyle.
+    if girdiler["ozkaynak_tl"] is None and girdiler["net_kar_ttm"] is None:
+        satir["not"] = (
+            f"{kod.upper()} icin Is Yatirim'da finansal tablo bulunamadi, bu yuzden "
+            "F/K ve PD/DD hesaplanamadi. Fiyat ve piyasa degeri gecerlidir. "
+            "Bu oranlarin BILINMEDIGINI soyle; sifir ya da dusuk gibi sunma."
+        )
+    elif girdiler["ozkaynak_tl"] is None:
+        satir["not"] = "Ozkaynak verisi bulunamadi; PD/DD hesaplanamadi."
+    elif girdiler["net_kar_ttm"] is None:
+        satir["not"] = "Son 12 ay kari hesaplanamadi; F/K verilemiyor."
     return satir
 
 
