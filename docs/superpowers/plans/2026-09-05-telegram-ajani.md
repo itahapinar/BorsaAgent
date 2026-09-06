@@ -86,7 +86,7 @@ adlarını ve şemalarını görür. `bist_mcp/` Telegram'ı ve NVIDIA'yı bilme
   `nvidia_base_url`, `admin_user_id`, `log_seviyesi`), `ayarlari_yukle(cevre: dict) -> Ayarlar`,
   `TRT: datetime.timezone`, `simdi_trt() -> datetime.datetime`, `log_kur(seviye: str) -> None`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_config.py`:
 
@@ -146,12 +146,12 @@ def test_ayarlar_repr_sirri_sizdirmaz():
     assert "123:abc" not in metin
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_config.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/__init__.py` ve `ajan/tests/__init__.py` boş dosyalar.
 
@@ -230,7 +230,7 @@ def log_kur(seviye: str = "INFO") -> None:
     )
 ```
 
-- [ ] **Step 4: `.env.example`'ı genişlet**
+- [x] **Step 4: `.env.example`'ı genişlet**
 
 ```
 # --- Asama 1 (MCP sunucusu) ---
@@ -249,12 +249,12 @@ NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 ADMIN_USER_ID=
 ```
 
-- [ ] **Step 5: Testleri koş**
+- [x] **Step 5: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_config.py -v`
 Expected: 7 passed
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ajan/ .env.example
@@ -295,7 +295,7 @@ tetikler.
   `async cagir(ad: str, argumanlar: dict) -> str`, `async kapat() -> None`,
   `async _yeniden_bagla() -> None`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_mcp_baglanti.py`:
 
@@ -439,12 +439,12 @@ async def test_baglanmadan_cagirmak_net_hata_verir():
     assert "baglan" in str(hata.value)
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_mcp_baglanti.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.mcp_baglanti'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/mcp_baglanti.py`:
 
@@ -587,12 +587,12 @@ class McpBaglanti:
             kayit.info("MCP baglantisi kapatildi")
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_mcp_baglanti.py -v`
 Expected: 8 passed
 
-- [ ] **Step 5: Gerçek sunucuya bağlanan ağ testini yaz ve koş**
+- [x] **Step 5: Gerçek sunucuya bağlanan ağ testini yaz ve koş**
 
 `ajan/tests/test_mcp_baglanti.py` sonuna eklenir:
 
@@ -639,7 +639,7 @@ async def test_olmayan_arac_istisna_firlatmaz():
 Run: `python -m pytest ajan/tests/test_mcp_baglanti.py -m network -v`
 Expected: 2 passed (~20 sn)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ajan/mcp_baglanti.py ajan/tests/test_mcp_baglanti.py
@@ -660,7 +660,7 @@ git commit -m "feat: uzun omurlu MCP baglantisi ve arac semasi cevrimi"
   `tarih(deger: datetime | date | str) -> str`, `buyuk_sayi(deger: float) -> str`,
   `mesaji_bol(metin: str, sinir: int = 4096) -> list[str]`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_bicim.py`:
 
@@ -730,12 +730,12 @@ def test_bolme_bosluk_disinda_karakter_kaybetmez():
     assert sadelestir("".join(mesaji_bol(metin))) == sadelestir(metin)
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_bicim.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.bicim'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/bicim.py`:
 
@@ -809,12 +809,12 @@ def mesaji_bol(metin: str, sinir: int = TELEGRAM_SINIRI) -> list[str]:
     return parcalar
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_bicim.py -v`
 Expected: 8 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ajan/bicim.py ajan/tests/test_bicim.py
@@ -835,7 +835,7 @@ git commit -m "feat: Turkce bicimlendirme ve 4096 karakter bolme"
   `ekle(rol: str, icerik: str, arac_sonucu: bool = False) -> None`,
   `gecmis() -> list[dict]`, `sifirla() -> None`, `kaba_token(metin: str) -> int`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_hafiza.py`:
 
@@ -903,12 +903,12 @@ def test_son_mesaj_tavandan_buyuk_olsa_bile_kalir(tmp_path):
     assert len(hafiza.gecmis()) == 1
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_hafiza.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.hafiza'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/hafiza.py`:
 
@@ -992,12 +992,12 @@ class Hafiza:
         self._baglanti.commit()
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_hafiza.py -v`
 Expected: 7 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ajan/hafiza.py ajan/tests/test_hafiza.py
@@ -1016,7 +1016,7 @@ git commit -m "feat: SQLite sohbet hafizasi, son-tur arac sonucu kurali"
 - Consumes: `simdi_trt` (Task 1)
 - Produces: `sistem_promptu(simdi: datetime | None = None) -> str`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_prompt.py`:
 
@@ -1060,12 +1060,12 @@ def test_prompt_makul_boyutta():
     assert len(sistem_promptu()) < 3000
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_prompt.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.prompt'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/prompt.py`:
 
@@ -1127,12 +1127,12 @@ def sistem_promptu(simdi: dt.datetime | None = None) -> str:
     )
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_prompt.py -v`
 Expected: 6 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ajan/prompt.py ajan/tests/test_prompt.py
@@ -1153,7 +1153,7 @@ git commit -m "feat: sistem promptu, bugunun tarihi ve veri kurallari"
 - Produces: `Ajan(ayarlar, mcp, hafiza, tur_tavani: int = 5)` sınıfı;
   `async cevapla(soru: str) -> str`, `TUR_TAVANI: int`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_ajan.py`:
 
@@ -1330,12 +1330,12 @@ async def test_sistem_promptu_her_istekte_var(tmp_path):
     assert llm.istekler[0]["messages"][0]["role"] == "system"
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_ajan.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.ajan'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/ajan.py`:
 
@@ -1454,12 +1454,12 @@ class Ajan:
         return cevap
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_ajan.py -v`
 Expected: 7 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ajan/ajan.py ajan/tests/test_ajan.py
@@ -1480,7 +1480,7 @@ git commit -m "feat: NVIDIA function-calling dongusu, tur tavani ve paralel arac
 - Produces: `yetkili_mi(gonderen_id: int, admin_id: int) -> bool`,
   `async mesaji_isle(ajan, metin: str) -> list[str]`, `async main() -> None`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_bot.py`:
 
@@ -1536,12 +1536,12 @@ async def test_ajan_hatasi_kullaniciya_ham_gosterilmez():
     assert "hata" in parcalar[0].lower()
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_bot.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.bot'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/bot.py`:
 
@@ -1662,12 +1662,12 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_bot.py -v`
 Expected: 5 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ajan/bot.py ajan/tests/test_bot.py
@@ -1690,7 +1690,7 @@ değiştiği için model kimlikleri sabit yazılmaz, `/v1/models`'ten keşfedili
 - Produces: `SORULAR: list[tuple[str, str]]`, `aday_modelleri_sec(kimlikler: list[str]) -> list[str]`,
   `isabet_hesapla(sonuclar: list[bool]) -> float`, `async main() -> None`
 
-- [ ] **Step 1: Başarısız testi yaz**
+- [x] **Step 1: Başarısız testi yaz**
 
 `ajan/tests/test_model_karsilastir.py`:
 
@@ -1734,12 +1734,12 @@ def test_isabet_yuzdesi():
     assert isabet_hesapla([]) == 0.0
 ```
 
-- [ ] **Step 2: Testi koş, başarısız olduğunu doğrula**
+- [x] **Step 2: Testi koş, başarısız olduğunu doğrula**
 
 Run: `python -m pytest ajan/tests/test_model_karsilastir.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'ajan.model_karsilastir'`
 
-- [ ] **Step 3: İmplementasyonu yaz**
+- [x] **Step 3: İmplementasyonu yaz**
 
 `ajan/model_karsilastir.py`:
 
@@ -1915,19 +1915,19 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-- [ ] **Step 4: Testleri koş**
+- [x] **Step 4: Testleri koş**
 
 Run: `python -m pytest ajan/tests/test_model_karsilastir.py -v`
 Expected: 5 passed
 
-- [ ] **Step 5: Betiği gerçekten çalıştır ve kazananı `.env`'e yaz**
+- [x] **Step 5: Betiği gerçekten çalıştır ve kazananı `.env`'e yaz**
 
 Run: `python -m ajan.model_karsilastir`
 
 Bu adım NVIDIA anahtarı gerektirir ve birkaç dakika sürer. Çıktıdaki
 `NVIDIA_MODEL=...` satırını `.env` dosyasına yaz. **Hedef 18/20.**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ajan/model_karsilastir.py ajan/tests/test_model_karsilastir.py
@@ -1946,7 +1946,7 @@ git commit -m "feat: model karsilastirma betigi, katalogdan aday kesfi"
 - Consumes: hepsi
 - Produces: yok (doğrulama görevi)
 
-- [ ] **Step 1: LLM'li uçtan uca testi yaz**
+- [x] **Step 1: LLM'li uçtan uca testi yaz**
 
 `ajan/tests/test_uctan_uca.py`:
 
@@ -2010,7 +2010,7 @@ async def test_takip_sorusu_baglami_koruyor(ajan):
     assert any(k in cevap.lower() for k in ("özkaynak", "milyar", "tl"))
 ```
 
-- [ ] **Step 2: `pytest.ini`'ye `llm` işaretini ekle**
+- [x] **Step 2: `pytest.ini`'ye `llm` işaretini ekle**
 
 `pytest.ini` içindeki `markers` bloğu şöyle olur:
 
@@ -2023,17 +2023,17 @@ addopts = -m "not network and not llm"
 asyncio_mode = auto
 ```
 
-- [ ] **Step 3: Hızlı testlerin hepsini koş**
+- [x] **Step 3: Hızlı testlerin hepsini koş**
 
 Run: `python -m pytest -q`
 Expected: Aşama 1'in 90 testi + Aşama 2'nin ~45 testi geçiyor, ağ ve llm hariç
 
-- [ ] **Step 4: LLM testlerini koş**
+- [x] **Step 4: LLM testlerini koş**
 
 Run: `python -m pytest ajan/ -m llm -v`
 Expected: 4 passed (NVIDIA anahtarı ve `NVIDIA_MODEL` gerekir)
 
-- [ ] **Step 5: README'ye Aşama 2 bölümünü ekle**
+- [x] **Step 5: README'ye Aşama 2 bölümünü ekle**
 
 `README.md` başındaki "Bu, iki aşamalı bir projenin 1. aşamasıdır" paragrafı
 kaldırılır ve şu bölüm `## Kurulum`'dan sonra eklenir:
@@ -2059,7 +2059,7 @@ tarama tablosunu kuruyor, çağrı başına bağlanmak o işi her seferinde
 tetiklerdi.
 ````
 
-- [ ] **Step 6: Telegram'da elle doğrula**
+- [x] **Step 6: Telegram'da elle doğrula**
 
 Bot çalışırken sırayla yaz. Her satır ölçülmüş bir davranışı sınıyor:
 
@@ -2079,7 +2079,7 @@ Bot çalışırken sırayla yaz. Her satır ölçülmüş bir davranışı sın�
 
 **En kritikleri 3, 8 ve 9.**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add ajan/tests/test_uctan_uca.py pytest.ini README.md
@@ -2106,3 +2106,32 @@ git commit -m "feat: uctan uca LLM testleri, README ve elle dogrulama listesi"
 - **Sesli mesaj, görsel, grafik üretimi.** Cevaplar metin.
 - **Cevabın öznel kalitesinin ölçülmesi.** Yalnızca araç seçimi ve verinin
   doğru aktarımı ölçülür (spec §9).
+
+
+---
+
+## Uygulama notları (2026-09-06)
+
+Aşama 2 tamamlandı. Kod yazılmadan önce ölçüm yapıldığı için planda beş gerçek
+kusur ve üç test kusuru bulundu; hepsi düzeltildi ve her biri regresyon testine
+bağlandı.
+
+| Görev | Kusur | Kanıt |
+|---|---|---|
+| 2 | `AsyncExitStack` tasarımı: `stdio_client` cancel scope'u girildiği task'te kapanmak zorunda | `RuntimeError: Attempted to exit cancel scope in a different task` — alt süreç sızıyordu. Oturum tek sahip task'e alındı |
+| 4, 6 | Araç sonuçları çıplak `role:"tool"` kaydediliyordu | `400 missing field tool_call_id` — araç kullanan her sohbetin 2. sorusu kırılırdı. `tool_call_id` + assistant gövdesi saklanıyor |
+| 4, 6 | `gecmis()` son turu `MAX(tur)` ile buluyordu | Yeni soru turu artırdığı için önceki turun araç verisi modele hiç gitmiyordu. Son *araç içeren* tura bakılıyor |
+| 7 | `from_user` kanal gönderilerinde `None`; `hafiza` hiç kapanmıyor | `.id` patlar; Windows SQLite dosyayı kilitler |
+| 8 | Ölçüm kullanılabilir sonuç vermiyordu | 19 adayın 5'i deneniyordu ve `.env`'deki model hiç ölçülmedi; güvenlik/ödül/temel modeller aday sayılıyordu; altyapı 500'leri yanlış cevap sayılıyordu; zaman aşımı yoktu (kazanan çağrı başına 232 sn) |
+| 5 | Gün adı testi `"Cuma" in metin` — "Cumartesi"nin içinde de geçer | Yanlış günde de geçerdi |
+| 5 | `"TAVSİYESİ".lower()` noktayı ayrı karakter bırakıyor | `"tavsiye"` bulunamıyor |
+| 9 | `"18" not in cevap` fazla geniş | Cevaptaki herhangi bir tarih/tutar testi kırardı; ölçülmüş yanlış değer (18,64) hedeflendi |
+
+Ayrıca ölçüm log'unda Aşama 1'e ait bir hata çıktı: `CREATE TABLE IF NOT EXISTS`
+mevcut tabloya sütun eklemediği için hacim sütunu eklendiğinde eski
+`gorunum.db` bozuk kaldı (`no column named ortalama_hacim_tl`) ve
+`hisse_tarama` eski kurulumlarda sessizce çalışmadı. Göç eklendi.
+
+Sistem promptuna, Aşama 1 araçlarının doldurduğu `not` alanını aktarma kuralı
+eklendi; yoksa model çoklu hisse sınıfı uyarısını yutup sayıyı kesin gibi
+sunuyordu.
