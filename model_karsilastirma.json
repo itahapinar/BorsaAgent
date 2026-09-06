@@ -1,0 +1,112 @@
+[
+  {
+    "model": "nvidia/nemotron-3-super-120b-a12b",
+    "isabet": 80.0,
+    "dogru": 16,
+    "ortalama_gecikme": 2.67,
+    "yanlislar": [
+      "GARAN'ın bilançosunu göster -> hisse_ara (beklenen finansal_tablo)",
+      "ASELS'in PD/DD oranı nedir? -> hisse_ara (beklenen finansal_oranlar)",
+      "ASELS'in son KAP açıklamaları neler? -> hisse_ara (beklenen kap_bildirimleri)",
+      "ASELS ne iş yapıyor? -> hisse_ara (beklenen sirket_profili)"
+    ],
+    "hatalar": [],
+    "atlandi": false
+  },
+  {
+    "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "isabet": 60.0,
+    "dogru": 12,
+    "ortalama_gecikme": 11.7,
+    "yanlislar": [
+      "GARAN'ın bilançosunu göster -> hisse_ara (beklenen finansal_tablo)",
+      "EREGL'in gelir tablosu nasıl? -> hisse_ara (beklenen finansal_tablo)",
+      "THYAO'nun F/K'sı kaç? -> hisse_ara (beklenen finansal_oranlar)",
+      "GARAN temettü verdi mi? -> hisse_ara (beklenen temettu_gecmisi)",
+      "TUPRS'un temettü geçmişi -> hisse_ara (beklenen temettu_gecmisi)",
+      "ASELS'in son KAP açıklamaları neler? -> hisse_ara (beklenen kap_bildirimleri)",
+      "ASELS ile THYAO'yu karşılaştır -> hisse_ara (beklenen hisse_karsilastir)",
+      "Bankacılık sektörü nasıl görünüyor? -> hisse_ara (beklenen sektor_karsilastirma)"
+    ],
+    "hatalar": [],
+    "atlandi": false
+  },
+  {
+    "model": "mistralai/mistral-nemotron",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> APITimeoutError",
+      "ASELS şu an ne kadar? -> InternalServerError",
+      "GARAN'ın bilançosunu göster -> InternalServerError"
+    ],
+    "atlandi": true
+  },
+  {
+    "model": "moonshotai/kimi-k2.6",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> NotFoundError",
+      "ASELS şu an ne kadar? -> NotFoundError",
+      "GARAN'ın bilançosunu göster -> NotFoundError"
+    ],
+    "atlandi": true
+  },
+  {
+    "model": "moonshotai/kimi-k3",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> APITimeoutError",
+      "ASELS şu an ne kadar? -> APITimeoutError",
+      "GARAN'ın bilançosunu göster -> APITimeoutError"
+    ],
+    "atlandi": true
+  },
+  {
+    "model": "nvidia/llama-3.1-nemotron-51b-instruct",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> NotFoundError",
+      "ASELS şu an ne kadar? -> NotFoundError",
+      "GARAN'ın bilançosunu göster -> NotFoundError"
+    ],
+    "atlandi": true
+  },
+  {
+    "model": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> NotFoundError",
+      "ASELS şu an ne kadar? -> NotFoundError",
+      "GARAN'ın bilançosunu göster -> NotFoundError"
+    ],
+    "atlandi": true
+  },
+  {
+    "model": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+    "isabet": 0.0,
+    "dogru": 0,
+    "ortalama_gecikme": null,
+    "yanlislar": [],
+    "hatalar": [
+      "THYAO kaç TL? -> NotFoundError",
+      "ASELS şu an ne kadar? -> NotFoundError",
+      "GARAN'ın bilançosunu göster -> NotFoundError"
+    ],
+    "atlandi": true
+  }
+]

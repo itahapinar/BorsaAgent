@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 from dotenv import load_dotenv
 
 from ajan.ajan import Ajan
@@ -17,12 +18,19 @@ from ajan.config import ayarlari_yukle
 from ajan.hafiza import Hafiza
 from ajan.mcp_baglanti import McpBaglanti
 
-pytestmark = pytest.mark.llm
+pytestmark = [pytest.mark.llm, pytest.mark.asyncio(loop_scope="module")]
 KOK = Path(__file__).resolve().parent.parent.parent
 
 
-@pytest.fixture
-async def ajan(tmp_path):
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
+async def ajan(tmp_path_factory):
+    """Tum LLM testleri TEK sunucu paylasir.
+
+    Fonksiyon kapsaminda her test yeni bir bist_mcp alt sureci baslatirdi ve
+    her acilis tarama tablosunu bastan kurar (~700 istek). Dort test =
+    ~2.800 istek; kaynak siteler bunu hos karsilamaz. Projenin kendi kurali
+    da bu: oturum uzun omurludur.
+    """
     load_dotenv()
     ayarlar = ayarlari_yukle(dict(os.environ))
     if not ayarlar.nvidia_model:
@@ -31,7 +39,7 @@ async def ajan(tmp_path):
     # sys.executable: PATH'teki "python" Microsoft Store kisayoluna dusebiliyor.
     mcp = McpBaglanti(sys.executable, ["-m", "bist_mcp.sunucu"], str(KOK))
     await mcp.baglan()
-    hafiza = Hafiza(tmp_path / "s.db")
+    hafiza = Hafiza(tmp_path_factory.mktemp("llm") / "s.db")
     try:
         yield Ajan(ayarlar, mcp, hafiza)
     finally:

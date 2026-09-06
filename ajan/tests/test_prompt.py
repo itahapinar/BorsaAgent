@@ -60,3 +60,14 @@ def test_not_alanini_aktarma_kurali_var():
 def test_prompt_makul_boyutta():
     """Her istekte gonderiliyor; sismesin."""
     assert len(sistem_promptu()) < 3000
+
+
+def test_kisaltma_acilimlari_veriliyor():
+    """Olculdu: model PD/DD'yi "Pi Degeri / Denge Degeri" diye acti.
+
+    Rakam dogruydu (ASELS 5,77) ama acilim uydurmaydi. Dogru acilim
+    promptta yazili olmazsa model tahmin ediyor.
+    """
+    metin = sistem_promptu()
+    assert "Piyasa Değeri / Defter Değeri" in metin
+    assert "Fiyat / Kazanç" in metin
