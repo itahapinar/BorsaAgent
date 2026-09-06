@@ -10,6 +10,11 @@ from bist_mcp.kaynaklar.isyatirim import (
     net_kar_ttm,
     OZKAYNAK_ADLARI,
     NET_KAR_ADLARI,
+    ANA_OZKAYNAK_ADLARI,
+    AZINLIK_OZKAYNAK_ADLARI,
+    ANA_KAR_ADLARI,
+    AZINLIK_KAR_ADLARI,
+    ana_ortaklik_payi,
     guncel_donem_sec,
     sifir_satirlari_at,
     tablo_bol,
@@ -281,3 +286,67 @@ def test_katilim_bankasi_roma_rakami_bankadan_farkli():
 def test_kalem_bul_sigorta_adini_bulur():
     kalemler = [{"ad": "Özsermaye Toplamı", "degerler": [40_045_701_921.0]}]
     assert kalem_bul(kalemler, *OZKAYNAK_ADLARI) == 40_045_701_921.0
+
+
+# --- Ana ortaklik payi: piyasa degeri sadece ana ortakligi temsil eder ---
+# Olculdu (AHGAZ, 06.09.2026) - gercek PD/DD 1,72 / F/K 18,22
+#   toplam ozkaynak 93,24 mlr icinde 33,30 mlr azinlik payi var
+#   toplamla PD/DD 1,08 (yanlis) -> ana ortaklikla 1,67 (dogru araligi)
+
+AHGAZ_BILANCO = [
+    {"ad": "Özkaynaklar", "degerler": [93_243_496_922.0]},
+    {"ad": "Ana Ortaklığa Ait Özkaynaklar", "degerler": [59_943_874_690.0]},
+    {"ad": "Azınlık Payları", "degerler": [33_299_622_232.0]},
+]
+AHGAZ_GELIR = [
+    {"ad": "DÖNEM KARI (ZARARI)", "degerler": [5_821_487_986.0]},
+    {"ad": "Azınlık Payları", "degerler": [1_498_878_165.0]},
+    {"ad": "Ana Ortaklık Payları", "degerler": [4_322_609_821.0]},
+]
+GARAN_BILANCO = [
+    {"ad": "XVI. ÖZKAYNAKLAR", "degerler": [489_428_000_000.0]},
+    {"ad": "16.5 Azınlık Payları", "degerler": [2_769_000_000.0]},
+]
+
+
+def test_dogrudan_ana_ortaklik_satiri_varsa_o_kullanilir():
+    sonuc = ana_ortaklik_payi(
+        AHGAZ_BILANCO, OZKAYNAK_ADLARI, ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI
+    )
+    assert sonuc == 59_943_874_690.0
+
+
+def test_dogrudan_satir_yoksa_toplamdan_azinlik_cikarilir():
+    """Bankalarda ana ortaklik ozkaynagi ayri satir olarak verilmiyor."""
+    sonuc = ana_ortaklik_payi(
+        GARAN_BILANCO, OZKAYNAK_ADLARI, ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI
+    )
+    assert sonuc == 489_428_000_000.0 - 2_769_000_000.0
+
+
+def test_azinlik_yoksa_toplam_kullanilir():
+    solo = [{"ad": "Özkaynaklar", "degerler": [1_000.0]}]
+    assert ana_ortaklik_payi(
+        solo, OZKAYNAK_ADLARI, ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI
+    ) == 1_000.0
+
+
+def test_azinlik_paylari_bolum_bazinda_ayrisir():
+    """REGRESYON: "Azınlık Payları" hem bilancoda hem gelirde geciyor.
+
+    Duz ad aramasi ozkaynak azinligini (33,3 mlr) kar azinligi (1,5 mlr)
+    yerine bulur ve net kari eksiye dusururdu.
+    """
+    kar = ana_ortaklik_payi(
+        AHGAZ_GELIR, NET_KAR_ADLARI, ANA_KAR_ADLARI, AZINLIK_KAR_ADLARI
+    )
+    assert kar == 4_322_609_821.0
+    assert kar > 0
+
+
+def test_ana_ortaklik_toplamdan_kucuk_olmali():
+    toplam = 93_243_496_922.0
+    ana = ana_ortaklik_payi(
+        AHGAZ_BILANCO, OZKAYNAK_ADLARI, ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI
+    )
+    assert ana < toplam, "ana ortaklik payi konsolide toplami asamaz"

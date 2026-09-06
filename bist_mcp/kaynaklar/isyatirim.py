@@ -180,6 +180,71 @@ NET_KAR_ADLARI = (
 )
 
 
+# ANA ORTAKLIK PAYI — piyasa degeri YALNIZCA ana ortakligin hissedarlarini
+# temsil eder. Konsolide toplam ozkaynak/kar icinde bagli ortakliklarin
+# baskalarina ait paylari da vardir; onlari cikarmadan bolmek orani
+# oldugundan DUSUK gosterir.
+#
+# Olculdu (AHGAZ, 06.09.2026) - gercek: PD/DD 1,72 / F/K 18,22
+#   toplam ozkaynak 93,24 mlr - azinlik 33,30 mlr = ana ortaklik 59,94 mlr
+#   toplam kar 5,82 mlr, ana ortaklik payi 4,32 mlr
+#   toplamla PD/DD 1,08 (yanlis), ana ortaklikla 1,72 (dogru)
+ANA_OZKAYNAK_ADLARI = ("Ana Ortaklığa Ait Özkaynaklar", "Ana Ortaklık Özkaynakları")
+AZINLIK_OZKAYNAK_ADLARI = (
+    "Azınlık Payları",
+    "16.5 Azınlık Payları",
+    "Kontrol Gücü Olmayan Paylar",
+)
+ANA_KAR_ADLARI = (
+    "Ana Ortaklık Payları",
+    "23.1 Grubun Karı/Zararı",
+    "18.1 Grubun Karı/Zararı",
+    "Grubun Karı/Zararı",
+)
+AZINLIK_KAR_ADLARI = (
+    "Azınlık Payları",
+    "23.2 Azınlık Hakları Karı/Zararı (-)",
+    "18.2 Azınlık Hakları Karı/Zararı (-)",
+    "Kontrol Gücü Olmayan Paylar",
+)
+
+
+def _bolumde_bul(kalemler: list[dict], adaylar: tuple[str, ...]) -> float | None:
+    """Yalnizca verilen bolum icinde arar.
+
+    Bolum ayrimi sart: "Azınlık Payları" hem bilancoda hem gelir tablosunda
+    geciyor (AHGAZ'da biri 33,3 mlr ozkaynak, digeri 1,5 mlr kar). Duz ad
+    aramasi ilk buldugunu doner ve iki kavrami karistirir.
+    """
+    for aday in adaylar:
+        for kalem in kalemler:
+            if kalem["ad"].strip() == aday:
+                degerler = [d for d in kalem["degerler"] if d is not None]
+                if degerler:
+                    return degerler[0]
+    return None
+
+
+def ana_ortaklik_payi(
+    bolum: list[dict], toplam_adlari: tuple[str, ...],
+    ana_adlari: tuple[str, ...], azinlik_adlari: tuple[str, ...],
+) -> float | None:
+    """Ana ortakliga dusen tutari doner.
+
+    Sirasiyla: dogrudan ana ortaklik satiri -> toplam eksi azinlik -> toplam.
+    """
+    dogrudan = _bolumde_bul(bolum, ana_adlari)
+    if dogrudan is not None:
+        return dogrudan
+
+    toplam = _bolumde_bul(bolum, toplam_adlari)
+    if toplam is None:
+        return None
+
+    azinlik = _bolumde_bul(bolum, azinlik_adlari)
+    return toplam - azinlik if azinlik is not None else toplam
+
+
 def guncel_donem_sec(dolu_donemler: dict[tuple[int, int], float]) -> tuple[int, int] | None:
     """Verisi olan donemlerden en yenisini secer."""
     return max(dolu_donemler) if dolu_donemler else None
@@ -316,8 +381,15 @@ class IsYatirimIstemci:
 
             slot = min(slotlar)  # en yeni donem ilk slotta
             yil, ay = bu_yil_pencere[slot - 1]
-            ozkaynak = self._slot_degeri(ham, slot, OZKAYNAK_ADLARI)
-            kar_kumulatif = self._slot_degeri(ham, slot, NET_KAR_ADLARI)
+            bolumler = tablo_bol(kalem_ayikla(ham, [slot]))
+            ozkaynak = ana_ortaklik_payi(
+                bolumler["bilanco"], OZKAYNAK_ADLARI,
+                ANA_OZKAYNAK_ADLARI, AZINLIK_OZKAYNAK_ADLARI,
+            )
+            kar_kumulatif = ana_ortaklik_payi(
+                bolumler["gelir"], NET_KAR_ADLARI,
+                ANA_KAR_ADLARI, AZINLIK_KAR_ADLARI,
+            )
 
             net_kar = net_kar_ttm(kar_kumulatif, None, None, ay)
             if net_kar is None and kar_kumulatif is not None:
@@ -325,12 +397,14 @@ class IsYatirimIstemci:
                 # yilligi gerekiyor. Ikisi tek istekte alinir.
                 gecmis_pencere = [(yil - 1, ay), (yil - 1, 12)]
                 gecmis = await self._getir(kod, grup, gecmis_pencere)
-                net_kar = net_kar_ttm(
-                    kar_kumulatif,
-                    self._slot_degeri(gecmis, 1, NET_KAR_ADLARI),
-                    self._slot_degeri(gecmis, 2, NET_KAR_ADLARI),
-                    ay,
-                )
+
+                def _ana_kar(slot: int) -> float | None:
+                    bol = tablo_bol(kalem_ayikla(gecmis, [slot]))
+                    return ana_ortaklik_payi(
+                        bol["gelir"], NET_KAR_ADLARI, ANA_KAR_ADLARI, AZINLIK_KAR_ADLARI
+                    )
+
+                net_kar = net_kar_ttm(kar_kumulatif, _ana_kar(1), _ana_kar(2), ay)
 
             if ozkaynak is not None or net_kar is not None:
                 return {
