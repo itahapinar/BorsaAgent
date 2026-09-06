@@ -237,6 +237,11 @@ async def finansal_oranlar(kod: str) -> dict:
 
     toplu = await fiyat.toplu([kod])
 
+    temettu, temettu_notu = temettu_yedekli(
+        toplu.get(kod.strip().upper(), {}).get("temettu_12ay"),
+        gorunum.satir_al(kod),
+    )
+
     satir = satir_hesapla(
         {
             "kod": kod.upper(),
@@ -252,7 +257,7 @@ async def finansal_oranlar(kod: str) -> dict:
         anlik["fiyat"],
         # Varsayilan 0.0 YOK: toplu indirme bos donunce "temettu odenmemis"
         # gibi okunuyordu (olculdu, GENKM). Bilinmemek ile odenmemek ayri.
-        toplu.get(kod.strip().upper(), {}).get("temettu_12ay"),
+        temettu,
         toplu.get(kod.strip().upper(), {}).get("ortalama_hacim_tl"),
     )
     satir.pop("guncelleme", None)
@@ -277,6 +282,8 @@ async def finansal_oranlar(kod: str) -> dict:
             "Temettu verisi alinamadi; tutar ve verim BILINMIYOR. "
             "'Temettu odenmemis' DEME."
         )
+    elif temettu_notu:
+        satir["not"] = temettu_notu
 
     # Makullük kontrolu. Coklu hisse sinifi olan sirketlerde odenmis sermaye
     # TUM siniflarin toplamidir ve tek sinifa atanamaz; ISATR'da PD/DD
@@ -298,6 +305,23 @@ async def finansal_oranlar(kod: str) -> dict:
                 "sunma, temkinli aktar."
             )
     return satir
+
+
+def temettu_yedekli(canli, gorunum_satiri) -> tuple[float | None, str | None]:
+    """Canli temettu gelmezse gunluk gorunum tablosundaki degeri kullanir.
+
+    Olculdu (GENKM): sunucunun acilistaki tazelemesi yfinance'i mesgul
+    ederken tekil toplu indirme bos donuyor ve temettu "veri yok" cikiyor --
+    oysa deger gorunum tablosunda duruyor. Temettu yillik bir olay; bir
+    gunluk anlik goruntu bu alan icin yeterince taze. Fiyat icin ayni sey
+    yapilmaz, orada bir gun eski veri yaniltir.
+    """
+    if canli is not None:
+        return canli, None
+    yedek = (gorunum_satiri or {}).get("temettu_12ay")
+    if yedek is None:
+        return None, None
+    return yedek, "Temettü, günlük görünüm tablosundan alındı (canlı veri gelmedi)."
 
 
 def _virgullu(deger: float, basamak: int) -> str:

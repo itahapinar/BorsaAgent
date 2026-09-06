@@ -121,6 +121,13 @@ class AnlikGorunum:
         )
         self._baglanti.commit()
 
+    def satir_al(self, kod: str) -> dict | None:
+        """Tek hissenin anlik goruntu satiri; canli veri gelmediginde yedek."""
+        satir = self._baglanti.execute(
+            "SELECT * FROM gorunum WHERE kod = ?", (kod.strip().upper(),)
+        ).fetchone()
+        return dict(satir) if satir else None
+
     def kayit_sayisi(self) -> int:
         return self._baglanti.execute("SELECT COUNT(*) FROM gorunum").fetchone()[0]
 
