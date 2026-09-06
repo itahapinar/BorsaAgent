@@ -93,3 +93,10 @@ def test_tahmin_yasagi_acik():
     metin = sistem_promptu()
     assert "TAHMİN ETME" in metin
     assert "tahmini" in metin
+
+
+def test_arac_rakamini_degistirmeme_kurali_var():
+    """Olculdu: arac temettu 0,2053 dondu, model "0,00 TL" yazdi."""
+    metin = sistem_promptu()
+    assert "0,2053" in metin
+    assert "hafızandan" in metin
