@@ -12,6 +12,7 @@ CEKIRDEK = {
     "temettu_gecmisi",
     "kap_bildirimleri",
     "kap_bildirim_detay",
+    "detayli_analiz",
 }
 
 
@@ -55,10 +56,10 @@ ANALIZ_VE_MAKRO = {
 
 
 @pytest.mark.asyncio
-async def test_toplam_16_arac_kayitli():
+async def test_toplam_17_arac_kayitli():
     adlar = {a.name for a in await sunucu.list_tools()}
     assert CEKIRDEK | ANALIZ_VE_MAKRO == adlar
-    assert len(adlar) == 16
+    assert len(adlar) == 17
 
 
 @pytest.mark.asyncio

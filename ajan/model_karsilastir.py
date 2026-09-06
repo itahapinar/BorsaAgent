@@ -3,7 +3,7 @@
   python -m ajan.model_karsilastir
 
 20 Turkce soru sorar, modelin DOGRU ARACI secip secmedigini olcer.
-16 aracin 14'unu kapsar; makro_gosterge (EVDS kapali) ve
+17 aracin 14.unu kapsar; makro_gosterge (EVDS kapali) ve
 kap_bildirim_detay (onceki cagrinin bildirim_no'sunu gerektirir) haric. Cevabin
 oznel kalitesi olculmez; olculen tek sey arac secimi ve gecikme.
 

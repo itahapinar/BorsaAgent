@@ -378,6 +378,84 @@ async def teknik_analiz(kod: str) -> dict:
     }
 
 
+
+# --- Detayli analiz --------------------------------------------------------
+# Olculdu (canli bot, GENKM): "detayli analiz" istendiginde model 3-4 arac
+# cagirip duruyordu. RSI/MACD hic gelmedi ve gelir tablosu cekilmedigi icin
+# "detayli gelir tablosu yok" deyip EBIT'i ve brut marji TAHMIN ETTI -- oysa
+# veri kaynakta vardi. Zinciri modele biraktikca eksik kaliyor ve tur tavani
+# (5) da yetismiyor; tek cagrida hepsi toplaniyor.
+ANALIZ_BOLUMLERI = (
+    "profil",
+    "fiyat",
+    "oranlar",
+    "teknik",
+    "bilanco",
+    "gelir_tablosu",
+    "nakit_akis",
+    "temettu",
+    "sektor",
+    "kap",
+)
+
+
+def analizi_derle(kod: str, sonuclar: dict) -> dict:
+    """Bolum sonuclarini tek cevaba toplar, alinamayanlari ACIKCA sayar.
+
+    Eksigi gizlemek modelin rakam uydurmasina yol aciyor; hangi bolumun
+    gelmedigi soylenirse "yok" diyor.
+    """
+    derlenen: dict = {"kod": kod.upper()}
+    eksik: list[str] = []
+
+    for ad in ANALIZ_BOLUMLERI:
+        sonuc = sonuclar.get(ad)
+        gecersiz = (
+            sonuc is None
+            or isinstance(sonuc, BaseException)
+            or (isinstance(sonuc, dict) and "hata" in sonuc)
+        )
+        derlenen[ad] = None if gecersiz else sonuc
+        if gecersiz:
+            eksik.append(ad)
+
+    derlenen["eksik_bolumler"] = eksik
+    if eksik:
+        derlenen["not"] = (
+            f"Su bolumler alinamadi: {', '.join(eksik)}. Bunlari BILINMIYOR "
+            "diye soyle; tahmin etme, uydurma, 'yaklasik' diye rakam uretme."
+        )
+    return derlenen
+
+
+@sunucu.tool()
+async def detayli_analiz(kod: str) -> dict:
+    """Bir hissenin TUM verisini tek cagrida toplar; detayli analiz icin bunu kullan.
+
+    Icerir: sirket profili, anlik fiyat, degerleme oranlari (F/K, PD/DD),
+    TEKNIK gostergeler (RSI, MACD, hareketli ortalamalar, destek/direnc),
+    bilanco, GELIR TABLOSU, nakit akis, temettu gecmisi, sektor konumu ve
+    son KAP bildirimleri.
+
+    "Detayli analiz", "her seyi anlat", "genis analiz" gibi isteklerde
+    araclari tek tek cagirmak yerine BUNU cagir. `eksik_bolumler` alanindaki
+    bolumler icin veri YOKTUR; onlari bilinmiyor diye soyle, tahmin etme.
+    """
+    gorevler = {
+        "profil": sirket_profili(kod),
+        "fiyat": anlik_fiyat(kod),
+        "oranlar": finansal_oranlar(kod),
+        "teknik": teknik_analiz(kod),
+        "bilanco": finansal_tablo(kod, "bilanco", "yillik", 2),
+        "gelir_tablosu": finansal_tablo(kod, "gelir", "yillik", 2),
+        "nakit_akis": finansal_tablo(kod, "nakit", "yillik", 2),
+        "temettu": temettu_gecmisi(kod),
+        "sektor": sektor_karsilastirma(kod),
+        "kap": kap_bildirimleri(kod, 90),
+    }
+    tamamlanan = await asyncio.gather(*gorevler.values(), return_exceptions=True)
+    return analizi_derle(kod, dict(zip(gorevler, tamamlanan)))
+
 @sunucu.tool()
 async def hisse_karsilastir(kodlar: list[str]) -> list[dict]:
     """Iki ile bes hisseyi temel oranlariyla yan yana koyar.

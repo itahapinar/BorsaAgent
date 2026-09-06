@@ -20,7 +20,7 @@ hissesi TRY işlem görüyor). İki kaynağı karıştırmak bu farkı gizler.
 
 ## Proje yapısı
 
-- `bist_mcp/` — MCP sunucusu (Aşama 1, tamamlandı). 16 araç.
+- `bist_mcp/` — MCP sunucusu (Aşama 1, tamamlandı). 17 araç.
 - `ajan/` — Telegram botu + NVIDIA function-calling döngüsü (Aşama 2, planlandı).
 - `docs/superpowers/specs/` — tasarım dokümanı
 - `docs/superpowers/plans/` — implementasyon planları

@@ -79,3 +79,17 @@ def test_binlik_ayirici_kurali_var():
     metin = sistem_promptu()
     assert "44.799.808" in metin
     assert "boşluk" in metin.lower()
+
+
+def test_detayli_analiz_araci_promptta_var():
+    """Olculdu: model detayli analizde 3-4 arac cagirip duruyordu."""
+    metin = sistem_promptu()
+    assert "detayli_analiz" in metin
+    assert "RSI" in metin
+
+
+def test_tahmin_yasagi_acik():
+    """Olculdu: model 'detayli gelir tablosu yok' deyip EBIT'i tahmin etti."""
+    metin = sistem_promptu()
+    assert "TAHMİN ETME" in metin
+    assert "tahmini" in metin

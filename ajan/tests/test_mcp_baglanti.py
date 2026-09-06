@@ -157,12 +157,12 @@ def _gercek() -> McpBaglanti:
 
 @pytest.mark.network
 async def test_gercek_sunucuya_baglanip_arac_cagirir():
-    """Asama 1 sunucusuyla uctan uca: 16 arac gelmeli, PD/DD dogru olmali."""
+    """Asama 1 sunucusuyla uctan uca: 17 arac gelmeli, PD/DD dogru olmali."""
     baglanti = _gercek()
     await baglanti.baglan()
     try:
         semalar = await baglanti.arac_semalari()
-        assert len(semalar) == 16
+        assert len(semalar) == 17
         assert semalar[0]["type"] == "function"
 
         metin = await baglanti.cagir("finansal_oranlar", {"kod": "THYAO"})
