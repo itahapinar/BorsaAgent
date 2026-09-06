@@ -9,6 +9,7 @@ neredeyse hic.
 """
 
 import asyncio
+import logging
 import sqlite3
 import time
 from pathlib import Path
@@ -20,22 +21,27 @@ from bist_mcp.kaynaklar.isyatirim import (  # noqa: F401
     hisse_adedi_sec,
 )
 
-SUTUNLAR = (
-    "kod",
-    "unvan",
-    "sektor",
-    "hisse_adedi",
-    "ozkaynak_tl",
-    "net_kar_tl",
-    "fiyat",
-    "temettu_12ay",
-    "pddd",
-    "fk",
-    "piyasa_degeri",
-    "temettu_verimi",
-    "ortalama_hacim_tl",
-    "guncelleme",
-)
+kayit = logging.getLogger(__name__)
+
+# Sutun -> SQLite tipi. Tek kaynak: hem CREATE TABLE hem de eski
+# veritabanlarina sutun ekleyen goc buradan okur.
+SUTUN_TIPLERI = {
+    "kod": "TEXT PRIMARY KEY",
+    "unvan": "TEXT",
+    "sektor": "TEXT",
+    "hisse_adedi": "INTEGER",
+    "ozkaynak_tl": "REAL",
+    "net_kar_tl": "REAL",
+    "fiyat": "REAL",
+    "temettu_12ay": "REAL",
+    "pddd": "REAL",
+    "fk": "REAL",
+    "piyasa_degeri": "REAL",
+    "temettu_verimi": "REAL",
+    "ortalama_hacim_tl": "REAL",
+    "guncelleme": "REAL",
+}
+SUTUNLAR = tuple(SUTUN_TIPLERI)
 
 # 630 hisselik tam kurulumda tum gorevleri ayni anda baslatmak, hiz
 # sinirlayiciyi kuyruga sokmasa bile yuzlerce acik baglanti demek.
@@ -82,16 +88,30 @@ class AnlikGorunum:
         self._fiyat = fiyat
         self._baglanti = sqlite3.connect(db_yolu, check_same_thread=False)
         self._baglanti.row_factory = sqlite3.Row
-        self._baglanti.execute(
-            "CREATE TABLE IF NOT EXISTS gorunum ("
-            "  kod TEXT PRIMARY KEY, unvan TEXT, sektor TEXT,"
-            "  hisse_adedi INTEGER, ozkaynak_tl REAL, net_kar_tl REAL,"
-            "  fiyat REAL, temettu_12ay REAL, pddd REAL, fk REAL,"
-            "  piyasa_degeri REAL, temettu_verimi REAL,"
-            "  ortalama_hacim_tl REAL, guncelleme REAL"
-            ")"
-        )
+        alanlar = ", ".join(f"{ad} {tip}" for ad, tip in SUTUN_TIPLERI.items())
+        self._baglanti.execute(f"CREATE TABLE IF NOT EXISTS gorunum ({alanlar})")
+        self._eksik_sutunlari_ekle()
         self._baglanti.commit()
+
+    def _eksik_sutunlari_ekle(self) -> None:
+        """Eski veritabanlarina sonradan eklenen sutunlari kazandirir.
+
+        CREATE TABLE IF NOT EXISTS mevcut tabloya sutun EKLEMEZ. Hacim sutunu
+        eklendiginde diskteki gorunum.db eski semada kaldi ve satir_yaz
+        "no column named ortalama_hacim_tl" ile kirildi -- yani hisse_tarama
+        eski kurulumlarda sessizce calismiyordu.
+        """
+        var_olan = {
+            s["name"] for s in self._baglanti.execute("PRAGMA table_info(gorunum)")
+        }
+        for ad, tip in SUTUN_TIPLERI.items():
+            if ad in var_olan:
+                continue
+            # PRIMARY KEY sonradan eklenemez; zaten tablo varsa anahtar da vardir.
+            self._baglanti.execute(
+                f"ALTER TABLE gorunum ADD COLUMN {ad} {tip.replace(' PRIMARY KEY', '')}"
+            )
+            kayit.info("gorunum tablosuna %s sutunu eklendi", ad)
 
     def satir_yaz(self, satir: dict) -> None:
         self._baglanti.execute(

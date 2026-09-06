@@ -120,3 +120,54 @@ def test_hacme_gore_siralanabilir(tmp_path):
     )
     sonuc = gorunum.satirlari_sec(sirala="ortalama_hacim_tl")
     assert sonuc[0]["kod"] == "LIKIT"
+
+
+# --- Sema gocu -------------------------------------------------------------
+# Olculdu: diskteki gorunum.db hacim sutunu eklenmeden once yaratilmisti ve
+# "no column named ortalama_hacim_tl" hatasi veriyordu. CREATE TABLE IF NOT
+# EXISTS mevcut tabloya sutun EKLEMEZ; eski veritabani sessizce bozuk kalir
+# ve hisse_tarama'nin yazmasi kirilir.
+
+ESKI_SEMA = (
+    "CREATE TABLE gorunum ("
+    "  kod TEXT PRIMARY KEY, unvan TEXT, sektor TEXT,"
+    "  hisse_adedi INTEGER, ozkaynak_tl REAL, net_kar_tl REAL,"
+    "  fiyat REAL, temettu_12ay REAL, pddd REAL, fk REAL,"
+    "  piyasa_degeri REAL, temettu_verimi REAL, guncelleme REAL"
+    ")"
+)
+
+
+def _eski_veritabani(yol):
+    import sqlite3
+
+    baglanti = sqlite3.connect(yol)
+    baglanti.execute(ESKI_SEMA)
+    baglanti.execute(
+        "INSERT INTO gorunum (kod, unvan, fiyat) VALUES ('THYAO', 'THY', 296.0)"
+    )
+    baglanti.commit()
+    baglanti.close()
+
+
+def test_eski_veritabanina_eksik_sutun_eklenir(tmp_path):
+    yol = tmp_path / "g.db"
+    _eski_veritabani(yol)
+
+    gorunum = AnlikGorunum(yol, kap=None, isyatirim=None, fiyat=None)
+    gorunum.satir_yaz(satir_hesapla(TEMEL, fiyat=296.00, temettu_12ay=0.0, ortalama_hacim_tl=1e9))
+
+    satirlar = gorunum.satirlari_sec(hacim_min=1e8)
+    assert [s["kod"] for s in satirlar] == ["THYAO"]
+
+
+def test_gocte_mevcut_veri_korunur(tmp_path):
+    yol = tmp_path / "g.db"
+    _eski_veritabani(yol)
+
+    gorunum = AnlikGorunum(yol, kap=None, isyatirim=None, fiyat=None)
+    kayit = gorunum._baglanti.execute(
+        "SELECT unvan, fiyat FROM gorunum WHERE kod = 'THYAO'"
+    ).fetchone()
+    assert kayit["unvan"] == "THY"
+    assert kayit["fiyat"] == 296.0
