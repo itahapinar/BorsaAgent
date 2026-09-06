@@ -31,3 +31,12 @@ def test_canli_sifir_yedege_dusmez():
     deger, kaynak_notu = temettu_yedekli(0.0, {"temettu_12ay": 0.2053})
     assert deger == 0.0
     assert kaynak_notu is None
+
+
+def test_fiyat_da_yedeklenir():
+    """Verim hesabi icin fiyat gerekiyor; ikisi ayni kaynaktan gelmeli."""
+    from bist_mcp.sunucu import fiyat_yedekli
+
+    assert fiyat_yedekli(11.15, {"fiyat": 9.0}) == 11.15
+    assert fiyat_yedekli(None, {"fiyat": 11.15}) == 11.15
+    assert fiyat_yedekli(None, None) is None

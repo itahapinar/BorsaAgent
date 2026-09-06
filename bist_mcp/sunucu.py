@@ -324,6 +324,11 @@ def temettu_yedekli(canli, gorunum_satiri) -> tuple[float | None, str | None]:
     return yedek, "Temettü, günlük görünüm tablosundan alındı (canlı veri gelmedi)."
 
 
+def fiyat_yedekli(canli, gorunum_satiri):
+    """Temettu verimi hesabi icin fiyat; canli yoksa gorunum tablosundan."""
+    return canli if canli is not None else (gorunum_satiri or {}).get("fiyat")
+
+
 def _virgullu(deger: float, basamak: int) -> str:
     """Turkce ondalik ayirici. Tek bir degere ozel replace calismaz."""
     return f"{deger:.{basamak}f}".replace(".", ",")
@@ -366,6 +371,9 @@ async def temettu_gecmisi(kod: str) -> dict:
     """
     toplu = await fiyat.toplu([kod])
     bildirimler = await kap.bildirimler(kod, gun=400)
+    canli = toplu.get(kod.strip().upper(), {})
+    yedek = gorunum.satir_al(kod)
+    temettu, _ = temettu_yedekli(canli.get("temettu_12ay"), yedek)
     anahtarlar = ("temettü", "kar payı", "sermaye artırım", "bedelsiz")
     ilgili = [
         b
@@ -374,10 +382,9 @@ async def temettu_gecmisi(kod: str) -> dict:
     ]
     return {
         "kod": kod.upper(),
-        **temettu_ozeti(
-            toplu.get(kod.strip().upper(), {}).get("temettu_12ay"),
-            toplu.get(kod.strip().upper(), {}).get("fiyat"),
-        ),
+        # finansal_oranlar ile AYNI yedegi kullanir; yoksa kart "0,2053 TL"
+        # derken bu bolum "veri yok" diyor ve cevap kendiyle celisiyordu.
+        **temettu_ozeti(temettu, fiyat_yedekli(canli.get("fiyat"), yedek)),
         "kap_bildirimleri": ilgili[:10],
     }
 
