@@ -1,10 +1,13 @@
-# BIST MCP Sunucusu
+# BIST Telegram Ajanı
 
-BIST hisseleri, endeksler, döviz/altın ve TCMB makro göstergeleri için MCP
-sunucusu. **16 araç**; veri İş Yatırım, KAP, yfinance ve TCMB EVDS'ten gelir.
+BIST hakkında serbest Türkçe soruları cevaplayan bir Telegram botu ve onu
+besleyen MCP sunucusu.
 
-Bu, iki aşamalı bir projenin **1. aşamasıdır**. 2. aşama (Telegram botu +
-NVIDIA function-calling döngüsü) bu sunucu elle doğrulandıktan sonra yazılır.
+- `bist_mcp/` — **16 araçlı MCP sunucusu**; veri İş Yatırım, KAP, yfinance ve
+  TCMB EVDS'ten gelir.
+- `ajan/` — Telegram botu ve NVIDIA function-calling döngüsü. Bot MCP
+  sunucusunu alt süreç olarak başlatır.
+
 Tasarım: `docs/superpowers/specs/2026-09-05-bist-telegram-agent-design.md`
 
 ## Kurulum
@@ -15,12 +18,34 @@ python -m venv .venv
 Copy-Item .env.example .env    # sonra .env'i doldur — GERÇEK ANAHTARLAR .env.example'A YAZILMAZ
 ```
 
+## Telegram botunu çalıştırma
+
+```powershell
+$env:PYTHONIOENCODING = "utf-8"
+python -m ajan.model_karsilastir   # bir kez: kazanan modeli .env'e yaz
+python -m ajan.bot
+```
+
+`.env` içindeki zorunlu alanlar: `TELEGRAM_BOT_TOKEN`, `NVIDIA_API_KEY`,
+`ADMIN_USER_ID`, `NVIDIA_MODEL`.
+
+Bot **yalnızca** `ADMIN_USER_ID`'ye cevap verir; başka herkesin mesajı sessizce
+reddedilir ve log'a bir satır düşer.
+
+MCP sunucusu bot tarafından alt süreç olarak başlatılır ve bot kapanana kadar
+ayakta kalır — ayrıca çalıştırmak gerekmez. Bu bilinçli: sunucu açılışta
+tarama tablosunu kuruyor, çağrı başına bağlanmak o işi her seferinde
+tetiklerdi. Aynı sebeple oturumu tek bir sahip task açıp kapatıyor; `stdio_client`
+girildiği task'te kapatılmazsa `RuntimeError: Attempted to exit cancel scope
+in a different task` veriyor ve alt süreç sızıyor (ölçüldü).
+
 ## Test
 
 ```powershell
 $env:PYTHONIOENCODING = "utf-8"
-python -m pytest bist_mcp/              # 120 hızlı test, ağ yok
-python -m pytest bist_mcp/ -m network   # 11 canlı test, ~10 sn
+python -m pytest                 # 184 hızlı test, ağ ve LLM yok
+python -m pytest -m network      # canlı veri kaynağı testleri
+python -m pytest ajan/ -m llm    # gerçek NVIDIA çağrısı yapan uçtan uca testler
 ```
 
 Windows konsolu cp1252 kullandığı için `PYTHONIOENCODING` gerekir; yoksa
