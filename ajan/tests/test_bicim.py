@@ -206,3 +206,19 @@ def test_alta_inen_sutun_baslik_adiyla_etiketlenir():
     """Ucuncu sutun veri olabilir; etiketsiz inince neyin nesi belli olmuyor."""
     hizali = tablo_hizala(UC_SUTUN_VERI, baslikli=True)
     assert "2024: 1,83 trilyon TL" in hizali
+
+
+def test_kirilmaz_bosluklu_sayi_da_duzeltilir():
+    """Model bazen U+00A0/U+202F yaziyor; duz bosluk arayan kontrol kaciriyor."""
+    assert "44.799.808" in telegram_html("Hacim 44\u00a0799\u00a0808 TL")
+    assert "1.018,52" in telegram_html("Özkaynak 1\u202f018,52 milyar TL")
+
+
+def test_aciklama_basligi_onek_olarak_tekrarlanmaz():
+    """Her satira "Açıklama:" yazmak gorsel gurultu; baslik zaten belli."""
+    tablo = [
+        ["Oran", "Değer", "Açıklama"],
+        ["F/K", "3,07", "Net kâr 133,05 milyar TL üzerinden"],
+    ]
+    assert "Açıklama:" not in tablo_hizala(tablo, baslikli=True)
+    assert "Net kâr 133,05 milyar TL üzerinden" in tablo_hizala(tablo, baslikli=True)

@@ -95,6 +95,14 @@ ASGARI_SUTUN = 6
 YATAY_CIZGI = re.compile(r"^\s*[-*_]{3,}\s*$", re.M)
 
 
+# Model bazen kirilmaz bosluk (U+00A0) ya da dar bosluk (U+202F) yaziyor.
+# Duz bosluk arayan kontroller bunlari kaciriyor ve textwrap da bunlardan
+# bolmedigi icin sayi tek dev jeton haline geliyor.
+OZEL_BOSLUKLAR = str.maketrans({"\u00a0": " ", "\u202f": " ", "\u2009": " ", "\u2007": " "})
+
+# Ucuncu sutun basligi bunlardan biriyse onek yazmak gereksiz tekrar olur.
+GENEL_BASLIKLAR = frozenset({"açıklama", "aciklama", "not", "notlar", "yorum"})
+
 # Olculdu: model kurala ragmen binlik ayirici olarak bosluk yaziyor
 # ("44 799 808"). Turkce bicim nokta; ayrica bosluklu sayi tabloda
 # bolunebilir hale geliyor. Modelin uymasina guvenmek yerine burada duzeltilir.
@@ -178,6 +186,8 @@ def tablo_hizala(
             # rakami). Etiketsiz inince "1,83 trilyon TL" neyin nesi belli
             # olmuyor; baslik varsa onunla etiketlenir.
             etiket = ek_basliklari[sutun] if sutun < len(ek_basliklari) else ""
+            if etiket.lower() in GENEL_BASLIKLAR:
+                etiket = ""
             yazi = f"{etiket}: {hucre}" if etiket else hucre
             ciktilar += [f"  {s}" for s in _sar(yazi, azami_genislik - 2)]
     return "\n".join(ciktilar)
@@ -220,6 +230,7 @@ def telegram_html(metin: str) -> str:
     HTML ozel karakterleri kacirilmazsa Telegram mesaji "can't parse
     entities" ile reddediyor.
     """
+    metin = metin.translate(OZEL_BOSLUKLAR)
     metin = YATAY_CIZGI.sub("", metin)
     metin = _binlik_ayiriciyi_duzelt(metin)
     govde, tablolar = _tablolari_ayikla(metin)
