@@ -269,6 +269,18 @@ Bu görevin en kritik kısıtı Aşama 1'den geliyor: MCP sunucusu açılışta 
 planda tarama tablosunu kuruyor. Çağrı başına oturum açmak o işi her seferinde
 tetikler.
 
+> **Ölçüm sonrası düzeltme (2026-09-06).** Aşağıdaki `AsyncExitStack` tasarımı
+> uygulanmadan önce ölçüldü ve **kırık çıktı**: `stdio_client` anyio cancel
+> scope kullanıyor, scope girildiği task'te kapatılmak zorunda. `baglan()` bir
+> task'te, `kapat()` başka bir task'te çağrılınca
+> `RuntimeError: Attempted to exit cancel scope in a different task than it was
+> entered in` fırlıyor ve alt süreç sızıyor. Botun gerçek deseni tam olarak bu
+> (açılış / mesaj / kapanış ayrı task'ler) ve `_yeniden_bagla()` de `kapat()`'ı
+> mesaj task'inden çağırıyor. Bu yüzden oturumu **tek bir sahip task**
+> (`_oturumu_tut`) açıp kapatıyor; `kapat()` yalnızca bir olay kurup o task'i
+> bekliyor. Arayüz plandaki gibi kaldı. Gerçek kod: `ajan/mcp_baglanti.py`,
+> regresyon testi: `test_ayri_tasklarda_acilip_kapanabilir`.
+
 **Files:**
 - Create: `ajan/mcp_baglanti.py`
 - Test: `ajan/tests/test_mcp_baglanti.py`
