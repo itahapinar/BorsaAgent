@@ -121,6 +121,9 @@ class AnlikGorunum:
         )
         self._baglanti.commit()
 
+    def kayit_sayisi(self) -> int:
+        return self._baglanti.execute("SELECT COUNT(*) FROM gorunum").fetchone()[0]
+
     def yas_saat(self) -> float | None:
         satir = self._baglanti.execute(
             "SELECT MIN(guncelleme) AS en_eski FROM gorunum"

@@ -39,6 +39,25 @@ gorunum = AnlikGorunum(KOK / "gorunum.db", kap, isyatirim, fiyat)
 GUNLUK_SANIYE = 24 * 3600
 HAFTALIK_SAAT = 7 * 24
 
+# Tablo bu oranin altindaysa tarama yarim kalmis sayilir. Kaynakta finansal
+# tablosu olmayan hisseler var (olculdu: 630'un 21'i), o yuzden %100 beklenmez.
+TAMLIK_ORANI = 0.9
+
+
+def tam_kurulum_gerekli(
+    yas_saat: float | None, kayit_sayisi: int, evren_boyutu: int
+) -> bool:
+    """Tam taramanin gerekip gerekmedigi.
+
+    YAS TEK BASINA YETMIYOR: satirlar tamamlandikca yazildigi icin yarida
+    kesilen bir tarama TAZE zaman damgali ama EKSIK bir tablo birakiyor.
+    Yalnizca yasa bakan karar bunu guncel sanip bir hafta boyunca tabloyu
+    hic kurmuyordu (olculdu: 630 hisselik evrende 7 kayit).
+    """
+    if yas_saat is None or yas_saat > HAFTALIK_SAAT:
+        return True
+    return kayit_sayisi < evren_boyutu * TAMLIK_ORANI
+
 kayit = logging.getLogger("bist_mcp")
 
 
@@ -53,7 +72,7 @@ async def gorunum_bakim() -> None:
         try:
             evren = await tarama_evreni(kap)
             yas = gorunum.yas_saat()
-            if yas is None or yas > HAFTALIK_SAAT:
+            if tam_kurulum_gerekli(yas, gorunum.kayit_sayisi(), len(evren)):
                 kayit.info("Anlik gorunum tam kuruluyor (~8 dk, %d ticker)", len(evren))
                 kayit.info("Tam kurulum bitti: %d hisse", await gorunum.tam_kurulum(evren))
             else:
