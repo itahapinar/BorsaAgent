@@ -114,3 +114,9 @@ def test_temettu_tarihi_kurali_var():
     metin = sistem_promptu()
     assert "`odemeler`" in metin
     assert "DUYURU" in metin
+
+
+def test_ic_arac_adi_yazma_kurali_var():
+    """Olculdu: model "Is Yatirim kaynagindan temettu_gecmisi fonksiyonu ile
+    cekilmistir" dedi; odemeler yfinance'ten geliyor, atif yanlisti."""
+    assert "İç araç/fonksiyon adlarını" in sistem_promptu()
