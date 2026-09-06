@@ -186,7 +186,7 @@ def test_ucuncu_sutun_satirin_altina_girintili_yazilir():
 
 def test_bosluklu_binlik_ayirici_noktaya_cevrilir():
     """Olculdu: model kurala ragmen "44 799 808" yaziyor. Turkce bicim nokta."""
-    assert "44.799.808" in telegram_html("Hacim 44 799 808 TL")
+    assert "44.799.808" in telegram_html("Hacim 44 799 808 lot")
     assert "1.018,52" in telegram_html("Özkaynak 1 018,52 milyar TL")
 
 
@@ -210,7 +210,7 @@ def test_alta_inen_sutun_baslik_adiyla_etiketlenir():
 
 def test_kirilmaz_bosluklu_sayi_da_duzeltilir():
     """Model bazen U+00A0/U+202F yaziyor; duz bosluk arayan kontrol kaciriyor."""
-    assert "44.799.808" in telegram_html("Hacim 44\u00a0799\u00a0808 TL")
+    assert "44.799.808" in telegram_html("Hacim 44\u00a0799\u00a0808 lot")
     assert "1.018,52" in telegram_html("Özkaynak 1\u202f018,52 milyar TL")
 
 
@@ -222,3 +222,26 @@ def test_aciklama_basligi_onek_olarak_tekrarlanmaz():
     ]
     assert "Açıklama:" not in tablo_hizala(tablo, baslikli=True)
     assert "Net kâr 133,05 milyar TL üzerinden" in tablo_hizala(tablo, baslikli=True)
+
+
+def test_ham_buyuk_tutarlar_okunabilir_yazilir():
+    """Model kurala uymayip ham rakam yazabiliyor; tabloda da tasiyor."""
+    sonuc = telegram_html("Toplam varlıklar 2.351.336.385.167 TL")
+    assert "2,35 trilyon TL" in sonuc
+    assert "2.351.336.385.167" not in sonuc
+
+
+def test_zaten_okunabilir_yazilmis_tutara_dokunulmaz():
+    assert "1,07 trilyon TL" in telegram_html("Özkaynak 1,07 trilyon TL")
+
+
+def test_kucuk_tutarlar_ve_yillar_degismez():
+    sonuc = telegram_html("Fiyat 296,00 TL, 2025 yılında 44.799 lot")
+    assert "296,00 TL" in sonuc
+    assert "2025" in sonuc
+    assert "44.799" in sonuc
+
+
+def test_bosluklu_tutar_hem_duzeltilir_hem_kisaltilir():
+    """Iki duzeltme birlikte calismali: bosluk -> nokta, sonra kisaltma."""
+    assert "44,80 milyon TL" in telegram_html("Hacim 44 799 808 TL")

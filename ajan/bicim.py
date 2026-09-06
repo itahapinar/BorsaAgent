@@ -113,6 +113,22 @@ def _binlik_ayiriciyi_duzelt(metin: str) -> str:
     return BOSLUKLU_SAYI.sub(lambda e: e.group(1).replace(" ", "."), metin)
 
 
+# Olculdu: model "buyuk rakamlari okunabilir yaz" kuralina tutarsiz uyuyor;
+# bazen 2.351.336.385.167 TL gibi ham basiyor ve bu hem okunmuyor hem de
+# tablo sutununa sigmiyor. En az 1.000.000 olan TL tutarlari cevrilir;
+# modelin zaten "1,07 trilyon TL" yazdigi yerlere dokunulmaz.
+HAM_TUTAR = re.compile(r"(?<![\d,.])(\d{1,3}(?:\.\d{3}){2,})(,\d+)?(\s*)TL\b")
+
+
+def _ham_tutarlari_kisalt(metin: str) -> str:
+    def cevir(eslesme: re.Match) -> str:
+        tamsayi = eslesme.group(1).replace(".", "")
+        ondalik = (eslesme.group(2) or ",0").replace(",", ".")
+        return buyuk_sayi(float(tamsayi + ondalik))
+
+    return HAM_TUTAR.sub(cevir, metin)
+
+
 def _kacir(metin: str) -> str:
     return metin.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -233,6 +249,7 @@ def telegram_html(metin: str) -> str:
     metin = metin.translate(OZEL_BOSLUKLAR)
     metin = YATAY_CIZGI.sub("", metin)
     metin = _binlik_ayiriciyi_duzelt(metin)
+    metin = _ham_tutarlari_kisalt(metin)
     govde, tablolar = _tablolari_ayikla(metin)
     govde = _kacir(govde)
     govde = KALIN.sub(r"<b>\1</b>", govde)
