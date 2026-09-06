@@ -28,6 +28,8 @@ YASAK_INFO_ALANLARI = frozenset(
 ANLIK_TTL = 60
 GECMIS_TTL = 3600
 BILGI_TTL = 7 * 24 * 3600
+# Temettu odemesi yilda birkac kez; gunluk tazeleme fazlasiyla yeterli.
+TEMETTU_TTL = 24 * 3600
 HACIM_PENCERESI = 60  # likidite icin son 60 islem gunu
 
 # Yahoo TEKIL uc noktalari (Ticker.history, Ticker.info) hizli ard arda
@@ -45,6 +47,14 @@ def bist_sembol(kod: str) -> str:
 def info_suz(ham: dict) -> dict:
     """Yalnizca izinli alanlari birakir; turetilmis alanlar atilir."""
     return {k: v for k, v in ham.items() if k in IZINLI_INFO_ALANLARI}
+
+
+def temettu_penceresi(odemeler: list[dict], yil: int, bugun=None) -> list[dict]:
+    """Son `yil` yildaki odemeleri yeniden eskiye siralar."""
+    bugun = bugun or dt.date.today()
+    sinir = bugun - dt.timedelta(days=365 * yil)
+    secilen = [o for o in odemeler if dt.date.fromisoformat(o["tarih"]) >= sinir]
+    return sorted(secilen, key=lambda o: o["tarih"], reverse=True)
 
 
 def ortalama_hacim_tl(hacimler, kapanislar, gun: int = HACIM_PENCERESI) -> float | None:
@@ -134,6 +144,35 @@ class FiyatKaynak:
         sonuc = await asyncio.to_thread(_cek)
         self._onbellek.yaz(anahtar, sonuc, GECMIS_TTL)
         return sonuc
+
+    async def _temettu_indir(self, kod: str) -> list[dict]:
+        """yfinance temettu serisi: odeme tarihi ve hisse basina tutar."""
+
+        def _cek() -> list[dict]:
+            seri = yf.Ticker(bist_sembol(kod)).dividends
+            return [
+                {"tarih": str(idx)[:10], "hisse_basina_tl": round(float(tutar), 4)}
+                for idx, tutar in seri.items()
+                if float(tutar) > 0
+            ]
+
+        await self._sinirlayici.bekle()
+        return await asyncio.to_thread(_cek)
+
+    async def temettu_odemeleri(self, kod: str, yil: int = 5, bugun=None) -> list[dict]:
+        """Gecmis temettu ODEMELERI: tarih + hisse basina tutar.
+
+        Olculdu (DOAS): "temettu tarihleri" sorulunca arac yalnizca KAP
+        DUYURU tarihlerini donduruyordu; duyuru tarihi odeme tarihi degildir
+        ve hisse basina tutari hic vermiyordu.
+        """
+        anahtar = f"fiyat:temettu:{kod.strip().upper()}"
+        ham = self._onbellek.al(anahtar)
+        if ham is None:
+            ham = await self._temettu_indir(kod)
+            if ham:
+                self._onbellek.yaz(anahtar, ham, TEMETTU_TTL)
+        return temettu_penceresi(ham, yil, bugun)
 
     async def sirket_bilgi(self, kod: str) -> dict:
         """Hisse adedi ve sektor. Turetilmis alanlar suzulur."""

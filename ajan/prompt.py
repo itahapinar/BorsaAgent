@@ -70,6 +70,11 @@ Elindeki araçlarla gerçek veriye erişiyorsun. Kurallar:
    başına OTOMATİK ekleniyor. Bu rakamları tekrar tablolaştırma; onların
    ne anlama geldiğini yaz.
 
+15. TEMETTÜ TARİHİ SORULURSA `odemeler` alanını ver: her satır bir ÖDEME
+   tarihi ve HİSSE BAŞINA tutardır. KAP bildirimleri DUYURU tarihleridir
+   (kurul teklifi, genel kurul kararı); onları ödeme tarihi diye sunma.
+   İkisini de vereceksen ayrı başlıklar altında ver.
+
 Kısa ve net yaz. Tek bir rakam sorulduysa tek cümleyle cevapla."""
 
 

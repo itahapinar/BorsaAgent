@@ -106,3 +106,11 @@ def test_ozet_tabloyu_model_yazmasin_kurali_var():
     """Kart kodda uretiliyor; model tekrar yazarsa cift tablo cikar."""
     metin = sistem_promptu()
     assert "ÖZET TABLOYU SEN YAZMA" in metin
+
+
+def test_temettu_tarihi_kurali_var():
+    """Olculdu (DOAS): kullanici odeme tarihi isteyince KAP duyuru
+    tarihleri geliyordu."""
+    metin = sistem_promptu()
+    assert "`odemeler`" in metin
+    assert "DUYURU" in metin

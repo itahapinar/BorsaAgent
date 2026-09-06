@@ -307,6 +307,23 @@ async def finansal_oranlar(kod: str) -> dict:
     return satir
 
 
+def odeme_notu(odemeler: list[dict]) -> str | None:
+    """Odeme tutarlarinin hangi bazda oldugunu soyler.
+
+    Kaynak seri, sonradan yapilan bolunme/bedelsiz islemlerine gore
+    duzeltilmis tutarlar veriyor (DOAS'ta 40,9091 TL gibi kusuratli
+    degerler bundan). Karsilastirma icin dogru baz budur ama o tarihte
+    KAP'ta ilan edilen brut tutarla birebir ayni olmayabilir.
+    """
+    if not odemeler:
+        return None
+    return (
+        "Ödeme tutarları, sonraki bölünme/bedelsiz işlemlerine göre "
+        "düzeltilmiş seriden gelir; o tarihte KAP'ta ilan edilen brüt tutarla "
+        "birebir aynı olmayabilir. Karşılaştırma için bu baz doğrudur."
+    )
+
+
 def temettu_yedekli(canli, gorunum_satiri) -> tuple[float | None, str | None]:
     """Canli temettu gelmezse gunluk gorunum tablosundaki degeri kullanir.
 
@@ -365,11 +382,20 @@ def temettu_ozeti(son_12ay_tl: float | None, fiyat_tl: float | None) -> dict:
 
 
 @sunucu.tool()
-async def temettu_gecmisi(kod: str) -> dict:
-    """Son bir yilda odenen temettuler ve KAP'taki temettu/sermaye artirimi
-    bildirimleri. Tarihleri gun.ay.yil olarak sun.
+async def temettu_gecmisi(kod: str, yil: int = 5) -> dict:
+    """Temettu ODEME gecmisi: her odemenin tarihi ve HISSE BASINA tutari.
+
+    `odemeler` alani asil cevaptir: gercekten para odenen tarihler ve
+    tutarlar. "Temettu tarihleri" sorulursa BUNLARI ver.
+
+    `kap_bildirimleri` ise DUYURU tarihleridir (yonetim kurulu teklifi,
+    genel kurul karari, odeme tarihi belirlenmesi). Duyuru tarihi odeme
+    tarihi DEGILDIR; ikisini karistirma, gerekiyorsa ayri baslikta ver.
+
+    Tarihleri gun.ay.yil olarak sun.
     """
     toplu = await fiyat.toplu([kod])
+    odemeler = await fiyat.temettu_odemeleri(kod, yil)
     bildirimler = await kap.bildirimler(kod, gun=400)
     canli = toplu.get(kod.strip().upper(), {})
     yedek = gorunum.satir_al(kod)
@@ -385,6 +411,9 @@ async def temettu_gecmisi(kod: str) -> dict:
         # finansal_oranlar ile AYNI yedegi kullanir; yoksa kart "0,2053 TL"
         # derken bu bolum "veri yok" diyor ve cevap kendiyle celisiyordu.
         **temettu_ozeti(temettu, fiyat_yedekli(canli.get("fiyat"), yedek)),
+        "odemeler": odemeler,
+        "odeme_sayisi": len(odemeler),
+        "odeme_notu": odeme_notu(odemeler),
         "kap_bildirimleri": ilgili[:10],
     }
 
