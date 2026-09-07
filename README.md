@@ -79,7 +79,7 @@ düşebiliyor ve sunucu "Server disconnected" ile anında ölüyor:
 `finansal_tablo` · `finansal_oranlar` · `temettu_gecmisi` · `kap_bildirimleri` ·
 `kap_bildirim_detay`
 
-**Analiz (5):** `teknik_analiz` · `hisse_karsilastir` · `sektor_karsilastirma` ·
+**Analiz (6):** `yonlu_hacim` · `teknik_analiz` · `hisse_karsilastir` · `sektor_karsilastirma` ·
 `hisse_tarama` · `endeks_verisi`
 
 **Makro (2):** `doviz_altin` · `makro_gosterge`
@@ -307,6 +307,26 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    bot tek bir mesajı düzenleyip sonunda siliyor. Aynı metin iki kez
    gönderilmez — Telegram değişmeyen düzenlemeyi reddediyor — ve bildirim
    hatası cevabı düşürmez.
+
+32. **"Kaç hisse alınmış / kaç satılmış" sorusunun birebir cevabı yoktur.**
+   Her işlemin hem alıcısı hem satıcısı vardır; iki sayı tanım gereği eşittir
+   ve günlük hacme eşittir (THYAO 04.09: 44.799.808 adet alınmış, aynı kadar
+   satılmış). Farklı çıkabilen tek ölçü, işlemin hangi tarafın **agresif**
+   davranmasıyla gerçekleştiğidir — `yonlu_hacim` bunu verir.
+
+   Sınıflandırma **tick testiyle** yapılır (5 dakikalık barlarda kapanış
+   yönü; yatay bar son yönü devralır). Ölçüldü (THYAO 04.09): açılış-kapanış
+   yöntemi hacmin **%20,4'ünü** sınıflandıramıyor, tick testi **%4,3**.
+   Sonuç: %43,8 alıcı / %52,0 satıcı yönlü.
+
+   İki şey açıkça söylenir: **tahmindir** (gerçek yöntem her işlemin alış mı
+   satış fiyatından geçtiğine bakar, tick verisi gerekir) ve **bar toplamı
+   resmî günlük hacimden düşük kalabilir** (42,5 mn / 44,8 mn).
+
+33. **Alan adı "lot" olursa model çevrim uyduruyor.** Ölçüldü: alanlar
+   `*_lot` iken model "1 lot = 100 hisse" deyip adetleri 100 katına çıkardı.
+   BIST'te 1 lot = 1 hissedir. Alanlar `*_adet` olarak adlandırıldı ve
+   çıktıya `birim` alanı eklendi; uydurma kayboldu.
 
 ## Hız sınırları
 

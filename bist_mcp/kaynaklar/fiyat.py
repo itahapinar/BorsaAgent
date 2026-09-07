@@ -30,6 +30,8 @@ GECMIS_TTL = 3600
 BILGI_TTL = 7 * 24 * 3600
 # Temettu odemesi yilda birkac kez; gunluk tazeleme fazlasiyla yeterli.
 TEMETTU_TTL = 24 * 3600
+# Seans ici barlar gun icinde degisir; gecmis gunlerde sabittir.
+SEANS_TTL = 300
 HACIM_PENCERESI = 60  # likidite icin son 60 islem gunu
 
 # Yahoo TEKIL uc noktalari (Ticker.history, Ticker.info) hizli ard arda
@@ -173,6 +175,37 @@ class FiyatKaynak:
             if ham:
                 self._onbellek.yaz(anahtar, ham, TEMETTU_TTL)
         return temettu_penceresi(ham, yil, bugun)
+
+    async def seans_barlari(
+        self, kod: str, baslangic: str, bitis: str, aralik: str = "5m"
+    ) -> list[dict]:
+        """Seans ici barlar (varsayilan 5 dakikalik): zaman, kapanis, hacim.
+
+        yfinance 5 dakikalik veriyi yalnizca son ~60 gun icin veriyor.
+        """
+        anahtar = f"fiyat:seans:{kod.upper()}:{baslangic}:{bitis}:{aralik}"
+        onbellekli = self._onbellek.al(anahtar)
+        if onbellekli is not None:
+            return onbellekli
+
+        def _cek() -> list[dict]:
+            veri = yf.Ticker(bist_sembol(kod)).history(
+                start=baslangic, end=bitis, interval=aralik
+            )
+            return [
+                {
+                    "zaman": str(idx)[:16],
+                    "kapanis": round(float(s["Close"]), 2),
+                    "hacim": int(s["Volume"]),
+                }
+                for idx, s in veri.iterrows()
+            ]
+
+        await self._sinirlayici.bekle()
+        sonuc = await asyncio.to_thread(_cek)
+        if sonuc:
+            self._onbellek.yaz(anahtar, sonuc, SEANS_TTL)
+        return sonuc
 
     async def sirket_bilgi(self, kod: str) -> dict:
         """Hisse adedi ve sektor. Turetilmis alanlar suzulur."""

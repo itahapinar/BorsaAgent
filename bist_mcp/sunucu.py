@@ -18,7 +18,12 @@ from mcp.server.fastmcp import FastMCP
 
 from bist_mcp.anlik_gorunum import AnlikGorunum, satir_hesapla
 from bist_mcp.evren import tarama_evreni
-from bist_mcp.hesap import oran_makul, temettu_verimi
+from bist_mcp.hesap import (
+    oran_makul,
+    son_seansi_ayikla,
+    temettu_verimi,
+    yonlu_hacim_hesapla,
+)
 from bist_mcp.kaynaklar.fiyat import FiyatKaynak
 from bist_mcp.kaynaklar.isyatirim import IsYatirimIstemci, hisse_adedi_sec, tablo_bol
 from bist_mcp.kaynaklar.kap import KapIstemci
@@ -662,6 +667,72 @@ async def detayli_analiz(kod: str) -> dict:
     }
     tamamlanan = await asyncio.gather(*gorevler.values(), return_exceptions=True)
     return analizi_derle(kod, dict(zip(gorevler, tamamlanan)))
+
+@sunucu.tool()
+async def yonlu_hacim(
+    kod: str, baslangic: str | None = None, bitis: str | None = None
+) -> dict:
+    """Alim/satim baskisi: hacmin ne kadari alici, ne kadari satici yonlu.
+
+    "Kac hisse alinmis kac hisse satilmis" sorusunun birebir cevabi YOKTUR:
+    her islemin hem alicisi hem saticisi vardir, iki sayi tanim geregi
+    esittir ve gunluk hacme esittir. Farkli cikabilen tek olcu, islemin
+    hangi tarafin AGRESIF davranmasiyla gerceklestigidir; bu arac onu verir.
+
+    Tarih verilmezse son islem gunu kullanilir. Hafta icin baslangic ve
+    bitis ver (gg dahil, ISO: 2026-09-01).
+
+    SONUC TAHMINDIR. 5 dakikalik barlarda tick testiyle hesaplanir; gercek
+    yontem her islemin alis mi satis fiyatindan gectigine bakar ve bunun
+    icin tick verisi gerekir. Cevapta tahmin oldugunu SOYLE.
+    """
+    import datetime as dt
+
+    bugun = dt.date.today()
+    if baslangic:
+        bas = dt.date.fromisoformat(baslangic)
+        bit = dt.date.fromisoformat(bitis) if bitis else bas
+        barlar = await fiyat.seans_barlari(kod, str(bas), str(bit + dt.timedelta(days=1)))
+        tek_seans = False
+    else:
+        # Hafta sonu/tatilde bugunun verisi yok; son 7 gun cekilip son seans alinir.
+        barlar = await fiyat.seans_barlari(
+            kod, str(bugun - dt.timedelta(days=7)), str(bugun + dt.timedelta(days=1))
+        )
+        tek_seans = True
+
+    if not barlar:
+        return {
+            "hata": f"{kod.upper()} icin seans ici veri bulunamadi. "
+            "5 dakikalik veri yalnizca son ~60 gun icin var."
+        }
+
+    if tek_seans:
+        barlar = son_seansi_ayikla(barlar)
+
+    sonuc = yonlu_hacim_hesapla(barlar)
+    sirket = await _sirket(kod)
+    return {
+        "kod": kod.upper(),
+        "unvan": sirket.unvan if sirket else None,
+        "baslangic": barlar[0]["zaman"],
+        "bitis": barlar[-1]["zaman"],
+        **sonuc,
+        "not": (
+            "1) Rakamlar HISSE ADEDIDIR. BIST'te 1 lot = 1 hissedir; lot "
+            "cevrimi YAPMA, 100 ile carpma. "
+            "2) Bu bir TAHMINDIR, gercek emir sayisi degildir: 5 dakikalik "
+            "barlarda tick testiyle hesaplanir. "
+            "3) Alinan toplam hisse ile satilan toplam hisse zaten esittir "
+            "(ikisi de gunluk hacim kadar). Burada olculen AYRI bir sey: "
+            "hacmin ne kadari alicinin, ne kadari saticinin agresif "
+            "davranmasiyla gerceklesmis. "
+            "4) Bar toplami resmî gunluk hacimden dusuk kalabilir (olculdu, "
+            "THYAO 04.09: 42,5 milyon / resmî 44,8 milyon); yuzdeler bar "
+            "toplami uzerinden hesaplanir. Bunlari cevapta acikca yaz."
+        ),
+    }
+
 
 @sunucu.tool()
 async def hisse_karsilastir(kodlar: list[str]) -> list[dict]:
