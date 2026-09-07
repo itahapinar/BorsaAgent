@@ -1,7 +1,17 @@
+# Surumler SABITLENMIS: sunucuda baska bir surumun kurulmasi, gelistirmede
+# gorulmeyen davranis farklarina yol acar.
+
+# --- MCP sunucusu (bist_mcp) ---
 mcp==1.28.1
 yfinance==1.0
 pandas==2.3.3
 httpx==0.28.1
+
+# --- Telegram ajani (ajan) ---
+aiogram==3.29.1
+openai==2.45.0
+python-dotenv==1.2.1
+
+# --- Test ---
 pytest==9.1.1
 pytest-asyncio==1.4.0
-python-dotenv==1.2.1
