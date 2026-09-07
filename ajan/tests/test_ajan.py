@@ -298,3 +298,35 @@ async def test_cevapta_kalinti_kalmaz(tmp_path):
     kirli = '{"kod": "DOAS"\n</tool_call>\nDOAS temettü tablosu'
     llm = SahteLLM([SahteYanit([SahteSecim(SahteMesaj(content=kirli))])])
     assert await _ajan(tmp_path, llm).cevapla("DOAS") == "DOAS temettü tablosu"
+
+
+# --- Durum bildirimi -------------------------------------------------------
+# Kullanici veri cekilirken hicbir geri bildirim gormuyordu.
+
+
+async def test_arac_calismadan_once_bildirim_gonderilir(tmp_path):
+    bildirilen = []
+
+    async def bildirim(adlar):
+        bildirilen.append(list(adlar))
+
+    llm = SahteLLM(_fiyat_turu())
+    ajan = _ajan(tmp_path, llm, SahteMcp())
+    await ajan.cevapla("THYAO kac TL?", bildirim=bildirim)
+    assert bildirilen == [["anlik_fiyat"]]
+
+
+async def test_bildirim_verilmezse_calismaya_devam_eder(tmp_path):
+    llm = SahteLLM(_fiyat_turu())
+    assert await _ajan(tmp_path, llm).cevapla("THYAO") == "THYAO 296,00 TL"
+
+
+async def test_bildirim_hatasi_cevabi_dusurmez(tmp_path):
+    """Telegram duzenleme hatasi yuzunden cevap kaybolmamali."""
+
+    async def patlayan(adlar):
+        raise RuntimeError("telegram hatasi")
+
+    llm = SahteLLM(_fiyat_turu())
+    cevap = await _ajan(tmp_path, llm).cevapla("THYAO", bildirim=patlayan)
+    assert cevap == "THYAO 296,00 TL"

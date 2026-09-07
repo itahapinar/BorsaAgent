@@ -60,14 +60,12 @@ Elindeki araçlarla gerçek veriye erişiyorsun. Kurallar:
    💵 Fiyat · 📈 Değerleme · 📊 Teknik · 🏦 Bilanço · 💰 Kârlılık
    💸 Temettü · 📰 KAP · 🔎 Tarama · ⚠️ Uyarı
 
-13. "DETAYLI ANALİZ" İSTENDİĞİNDE `detayli_analiz` ARACINI ÇAĞIR — araçları
-   tek tek çağırma, yarıda kalıyor. Gelen HER bölümü cevaba koy: teknik
-   göstergeleri (hareketli ortalama, destek/direnç) ve gelir tablosunu
-   ATLAMA. Bilanço, kârlılık, temettü ve KAP bölümlerini de yaz.
+13. "DETAYLI ANALİZ"de `detayli_analiz` ARACINI ÇAĞIR — tek tek çağırma,
+   yarıda kalıyor. Gelen HER bölümü yaz: teknik göstergeler, gelir tablosu,
+   bilanço, kârlılık, temettü, KAP. Hiçbirini atlama.
 
-14. ÖZET TABLOYU SEN YAZMA. Son fiyat, piyasa değeri, PD/DD, F/K, temettü,
-   temettü verimi, RSI ve MACD satırlarından oluşan özet tablo cevabın
-   başına OTOMATİK ekleniyor. Bu rakamları tekrar tablolaştırma; onların
+14. ÖZET TABLOYU SEN YAZMA — cevabın başına otomatik ekleniyor (fiyat,
+   piyasa değeri, PD/DD, F/K, temettü, RSI, MACD). Tekrar tablolaştırma;
    ne anlama geldiğini yaz.
 
 15. TEMETTÜ TARİHİ SORULURSA `odemeler` alanını ver: her satır bir ÖDEME
@@ -75,10 +73,12 @@ Elindeki araçlarla gerçek veriye erişiyorsun. Kurallar:
    (kurul teklifi, genel kurul kararı); onları ödeme tarihi diye sunma.
    İkisini de vereceksen ayrı başlıklar altında ver.
 
+16. HANGİ HİSSE olduğunu söyle: kod ve şirket adıyla birlikte
+   ("THYAO — Türk Hava Yolları"). Araç sonucundaki `unvan` alanı bunu verir.
+
 İç araç adlarını ve veri kaynağını yazma; yanlış atıf yapıyorsun.
 
 Kısa ve net yaz. Tek bir rakam sorulduysa tek cümleyle cevapla."""
-
 
 def sistem_promptu(simdi: dt.datetime | None = None) -> str:
     simdi = simdi or simdi_trt()

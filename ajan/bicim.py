@@ -335,3 +335,40 @@ def _etiketleri_dengele(parcalar: list[str]) -> list[str]:
         dengeli.append(parca)
 
     return dengeli
+
+
+# --- Durum mesaji ----------------------------------------------------------
+# Kullanici veri cekilirken hicbir geri bildirim gormuyordu; detayli analiz
+# ~20-30 sn suruyor ve bot donmus gibi duruyor.
+ARAC_ADLARI = {
+    "detayli_analiz": "detaylı analiz",
+    "anlik_fiyat": "anlık fiyat",
+    "gecmis_fiyat": "geçmiş fiyat",
+    "hisse_ara": "hisse arama",
+    "sirket_profili": "şirket profili",
+    "finansal_tablo": "finansal tablo",
+    "finansal_oranlar": "değerleme oranları",
+    "temettu_gecmisi": "temettü geçmişi",
+    "kap_bildirimleri": "KAP bildirimleri",
+    "kap_bildirim_detay": "KAP bildirim detayı",
+    "teknik_analiz": "teknik analiz",
+    "hisse_karsilastir": "hisse karşılaştırma",
+    "sektor_karsilastirma": "sektör karşılaştırma",
+    "hisse_tarama": "hisse tarama",
+    "endeks_verisi": "endeks verisi",
+    "doviz_altin": "döviz/altın",
+    "makro_gosterge": "makro gösterge",
+}
+BEKLEME_MESAJI = "⏳ Veriler çekiliyor…"
+
+
+def arac_adi_okunur(ad: str) -> str:
+    return ARAC_ADLARI.get(ad, ad.replace("_", " "))
+
+
+def durum_metni(adlar: list[str]) -> str:
+    """Calisan araclari kullaniciya gosterilecek tek satira cevirir."""
+    if not adlar:
+        return BEKLEME_MESAJI
+    tekil = list(dict.fromkeys(arac_adi_okunur(a) for a in adlar))
+    return "🔎 " + " · ".join(tekil) + " çekiliyor…"

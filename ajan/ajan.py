@@ -115,7 +115,16 @@ class Ajan:
         """Kart(lar)i cevabin basina koyar; rakamlar modelden gecmez."""
         return "\n\n".join([*kartlar, cevap]) if kartlar else cevap
 
-    async def cevapla(self, soru: str) -> str:
+    async def _bildir(self, bildirim, adlar: list[str]) -> None:
+        """Durum bildirimi cevabi dusurmemeli; Telegram duzenlemesi hata verebilir."""
+        if bildirim is None:
+            return
+        try:
+            await bildirim(adlar)
+        except Exception:  # noqa: BLE001
+            kayit.warning("Durum bildirimi gonderilemedi", exc_info=True)
+
+    async def cevapla(self, soru: str, bildirim=None) -> str:
         self._hafiza.ekle("user", soru)
         kartlar: list[str] = []
 
@@ -140,6 +149,10 @@ class Ajan:
             # Govde ve sonuclar BIRLIKTE kaydedilir. Sonraki turda tool
             # mesaji tool_call_id'siz giderse uc nokta 400 veriyor; govdesi
             # olmayan sonuc da OpenAI spec'ine aykiri.
+            # Arac CALISMADAN once bildir: kullanici bekledigi sureyi
+            # gormeli, cekim bittikten sonra haber vermenin faydasi yok.
+            await self._bildir(bildirim, [c.function.name for c in mesaj.tool_calls])
+
             govde = self._govde(mesaj.tool_calls)
             mesajlar.append(
                 {"role": "assistant", "content": mesaj.content, "tool_calls": govde}

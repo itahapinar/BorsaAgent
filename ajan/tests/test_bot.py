@@ -6,7 +6,7 @@ class SahteAjan:
         self._cevap = cevap
         self.sorulanlar = []
 
-    async def cevapla(self, soru):
+    async def cevapla(self, soru, bildirim=None):
         self.sorulanlar.append(soru)
         return self._cevap
 
@@ -52,7 +52,7 @@ async def test_uzun_cevap_bolunur():
 
 async def test_ajan_hatasi_kullaniciya_ham_gosterilmez():
     class PatlayanAjan:
-        async def cevapla(self, soru):
+        async def cevapla(self, soru, bildirim=None):
             raise RuntimeError("nvapi-gizli-anahtar gecersiz")
 
     parcalar = await mesaji_isle(PatlayanAjan(), "soru")
@@ -68,3 +68,38 @@ async def test_cevap_telegram_htmline_cevrilir():
     assert "<b>THYAO</b>" in parca
     assert "<pre>" in parca
     assert "|" not in parca and "**" not in parca
+
+
+# --- Durum mesaji ----------------------------------------------------------
+
+
+class SahteDurumMesaji:
+    def __init__(self):
+        self.metinler = []
+        self.silindi = False
+
+    async def edit_text(self, metin):
+        self.metinler.append(metin)
+
+    async def delete(self):
+        self.silindi = True
+
+
+async def test_durum_mesaji_arac_adlariyla_guncellenir():
+    from ajan.bot import durumu_guncelle
+
+    durum = SahteDurumMesaji()
+    await durumu_guncelle(durum)(["anlik_fiyat", "teknik_analiz"])
+    assert "anlık fiyat" in durum.metinler[0]
+    assert "teknik analiz" in durum.metinler[0]
+
+
+async def test_ayni_durum_iki_kez_gonderilmez():
+    """Telegram ayni metinle duzenlemeyi reddediyor."""
+    from ajan.bot import durumu_guncelle
+
+    durum = SahteDurumMesaji()
+    guncelle = durumu_guncelle(durum)
+    await guncelle(["anlik_fiyat"])
+    await guncelle(["anlik_fiyat"])
+    assert len(durum.metinler) == 1

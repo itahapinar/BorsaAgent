@@ -140,7 +140,12 @@ async def anlik_fiyat(kod: str) -> dict:
     'THYAO kac TL', 'ASELS ne kadar oldu' gibi sorularda kullan.
     """
     sonuc = await fiyat.anlik(kod)
-    return sonuc or {"hata": f"{kod.upper()} icin fiyat verisi bulunamadi."}
+    if not sonuc:
+        return {"hata": f"{kod.upper()} icin fiyat verisi bulunamadi."}
+    # Unvan olmadan model cevapta hangi sirket oldugunu soylemiyordu
+    # (olculdu: "thyao kac tl" -> yalnizca "Son fiyat 296,00 TL").
+    sirket = await _sirket(kod)
+    return {**sonuc, "unvan": sirket.unvan if sirket else None}
 
 
 @sunucu.tool()
@@ -547,13 +552,19 @@ def ozet_kart(ozet: dict) -> str:
 
     Model bu tabloyu yeniden yazmaz; ajan tarafi cevabin basina oldugu gibi
     ekler ve bicim.py hizali monospace bloga cevirir.
+
+    Ust satirda HANGI HISSE oldugu yazar: olculdu, kullanici yalnizca
+    rakamlari gorunce hangi sirket oldugunu bilemiyordu.
     """
     if not ozet:
         return ""
-    return "\n".join(
+
+    tablo = "\n".join(
         f"| {etiket} | {_bicimle(ozet.get(alan), tur, ozet)} |"
         for etiket, alan, tur in KART_SATIRLARI
     )
+    kimlik = " — ".join(x for x in (ozet.get("kod"), ozet.get("unvan")) if x)
+    return f"**{kimlik}**\n{tablo}" if kimlik else tablo
 
 
 OZET_ALANLARI = (
@@ -575,6 +586,7 @@ def _ozet_cikar(oranlar, teknik) -> dict:
     gelir tablosu iceriyor; onemli rakamlar en basta tekrarlaniyor.
     """
     ozet = {ad: (oranlar or {}).get(ad) for ad in OZET_ALANLARI}
+    ozet["unvan"] = (oranlar or {}).get("unvan")
     macd = (teknik or {}).get("macd")
     ozet["rsi_14"] = (teknik or {}).get("rsi_14")
     ozet["macd"] = macd.get("macd") if isinstance(macd, dict) else macd
@@ -593,6 +605,7 @@ def analizi_derle(kod: str, sonuclar: dict) -> dict:
                         or (isinstance(s, dict) and "hata" in s)) else s
 
     ozet = _ozet_cikar(_gecerli("oranlar"), _gecerli("teknik"))
+    ozet["kod"] = kod.upper()
     derlenen: dict = {
         "kod": kod.upper(),
         "ozet": ozet,

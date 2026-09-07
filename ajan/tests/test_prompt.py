@@ -120,3 +120,10 @@ def test_ic_arac_adi_yazma_kurali_var():
     """Olculdu: model "Is Yatirim kaynagindan temettu_gecmisi fonksiyonu ile
     cekilmistir" dedi; odemeler yfinance'ten geliyor, atif yanlisti."""
     assert "İç araç adlarını" in sistem_promptu()
+
+
+def test_hisse_kimligi_kurali_var():
+    """Olculdu: "thyao kac tl" cevabi sirket adini yazmiyordu."""
+    metin = sistem_promptu()
+    assert "HANGİ HİSSE" in metin
+    assert "`unvan`" in metin

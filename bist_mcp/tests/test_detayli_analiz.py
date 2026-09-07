@@ -123,3 +123,11 @@ def test_ozet_kart_cikttida_var():
     kart = analizi_derle("X", sonuclar)["ozet_kart"]
     assert "| Son fiyat | 11,15 TL |" in kart
     assert "%1,84" in kart
+
+
+def test_ozet_kod_ve_unvani_tasir():
+    sonuclar = _tam_sonuc()
+    sonuclar["oranlar"] = {"fiyat": 11.15, "unvan": "GENTAŞ A.Ş."}
+    ozet = analizi_derle("genkm", sonuclar)["ozet"]
+    assert ozet["kod"] == "GENKM"
+    assert ozet["unvan"] == "GENTAŞ A.Ş."

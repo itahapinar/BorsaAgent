@@ -70,3 +70,25 @@ def test_temettu_bilinmiyorsa_kart_sifir_gostermez():
     assert "0,0000 TL" not in kart
     assert "%0,00" not in kart
     assert kart.count("veri yok") >= 2
+
+
+# --- Sirket kimligi --------------------------------------------------------
+# Olculdu (canli bot): kart yalnizca rakamlari gosteriyordu, hangi hisse
+# oldugu yazmiyordu. "thyao kac tl" cevabi da sadece "Son fiyat 296,00 TL"
+# oldu; kullanici hangi sirket oldugunu goremedi.
+
+
+def test_kart_basliginda_kod_ve_unvan_var():
+    kart = ozet_kart(dict(TAM, kod="THYAO", unvan="TÜRK HAVA YOLLARI A.O."))
+    ilk = kart.split("\n")[0]
+    assert "THYAO" in ilk
+    assert "TÜRK HAVA YOLLARI A.O." in ilk
+
+
+def test_unvan_yoksa_kod_yeter():
+    ilk = ozet_kart(dict(TAM, kod="THYAO")).split("\n")[0]
+    assert "THYAO" in ilk
+
+
+def test_kimlik_yoksa_baslik_satiri_olmaz():
+    assert ozet_kart(TAM).split("\n")[0].startswith("|")

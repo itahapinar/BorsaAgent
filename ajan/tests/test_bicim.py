@@ -335,3 +335,33 @@ def test_uc_haneli_kesir_binlik_sayilir():
     """44.799 binlik ayiricidir; 44,799 diye cevrilirse tutar 1000 kat sasar."""
     assert "44.799" in telegram_html("Hacim 44.799 lot")
     assert "44,799" not in telegram_html("Hacim 44.799 lot")
+
+
+# --- Durum mesaji ----------------------------------------------------------
+# Kullanici veri cekilirken hicbir geri bildirim gormuyordu; detayli analiz
+# ~20-30 sn suruyor ve bot donmus gibi duruyor.
+
+from ajan.bicim import arac_adi_okunur, durum_metni  # noqa: E402
+
+
+def test_bilinen_arac_adi_turkcelesir():
+    assert arac_adi_okunur("detayli_analiz") == "detaylı analiz"
+    assert arac_adi_okunur("anlik_fiyat") == "anlık fiyat"
+    assert arac_adi_okunur("kap_bildirimleri") == "KAP bildirimleri"
+
+
+def test_bilinmeyen_arac_adi_okunur_hale_gelir():
+    assert arac_adi_okunur("yeni_bir_arac") == "yeni bir arac"
+
+
+def test_durum_metni_araclari_listeler():
+    metin = durum_metni(["anlik_fiyat", "teknik_analiz"])
+    assert "anlık fiyat" in metin and "teknik analiz" in metin
+
+
+def test_ayni_arac_tekrar_yazilmaz():
+    assert durum_metni(["anlik_fiyat", "anlik_fiyat"]).count("anlık fiyat") == 1
+
+
+def test_arac_yoksa_genel_mesaj():
+    assert durum_metni([]).strip() != ""

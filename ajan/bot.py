@@ -21,7 +21,7 @@ from aiogram.types import Message
 from dotenv import load_dotenv
 
 from ajan.ajan import Ajan
-from ajan.bicim import mesaji_bol, telegram_html
+from ajan.bicim import BEKLEME_MESAJI, durum_metni, mesaji_bol, telegram_html
 from ajan.config import ayarlari_yukle, log_kur
 from ajan.hafiza import Hafiza
 from ajan.mcp_baglanti import McpBaglanti
@@ -50,7 +50,25 @@ def yetkili_mi(gonderen: int | None, admin_id: int) -> bool:
     return gonderen == admin_id
 
 
-async def mesaji_isle(ajan, metin: str) -> list[str]:
+def durumu_guncelle(durum_mesaji):
+    """Arac adlarini durum mesajina yazan bir geri cagirim uretir.
+
+    Ayni metin iki kez gonderilmez: Telegram, icerigi degismeyen bir
+    duzenlemeyi "message is not modified" ile reddediyor.
+    """
+    son = {"metin": None}
+
+    async def bildir(adlar: list[str]) -> None:
+        metin = durum_metni(adlar)
+        if metin == son["metin"]:
+            return
+        son["metin"] = metin
+        await durum_mesaji.edit_text(metin)
+
+    return bildir
+
+
+async def mesaji_isle(ajan, metin: str, bildirim=None) -> list[str]:
     """Soruyu ajana verir, cevabi Telegram parcalarina boler.
 
     Cevap Telegram HTML'ine cevrilir: model markdown uretiyor, Telegram boru
@@ -61,7 +79,7 @@ async def mesaji_isle(ajan, metin: str) -> list[str]:
     bulunabilir. Log'a tam hali yazilir.
     """
     try:
-        cevap = await ajan.cevapla(metin)
+        cevap = await ajan.cevapla(metin, bildirim=bildirim)
     except Exception:
         kayit.exception("Ajan cevap uretemedi")
         return [HATA_MESAJI]
@@ -116,7 +134,17 @@ async def main() -> None:
 
         async with kilit:
             await bot.send_chat_action(mesaj.chat.id, "typing")
-            for parca in await mesaji_isle(ajan, mesaj.text):
+            # Detayli analiz 20-30 sn suruyor; kullanici ne bekledigini
+            # gormeli. Tek mesaj duzenlenir, sonunda silinir.
+            durum = await mesaj.answer(BEKLEME_MESAJI)
+            try:
+                parcalar = await mesaji_isle(ajan, mesaj.text, durumu_guncelle(durum))
+            finally:
+                try:
+                    await durum.delete()
+                except Exception:  # noqa: BLE001
+                    kayit.warning("Durum mesaji silinemedi", exc_info=True)
+            for parca in parcalar:
                 await mesaj.answer(parca)
 
     try:
