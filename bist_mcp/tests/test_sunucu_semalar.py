@@ -74,3 +74,22 @@ async def test_analist_gorusu_araci_yok():
 async def test_hisse_karsilastir_liste_alir():
     arac = next(a for a in await sunucu.list_tools() if a.name == "hisse_karsilastir")
     assert arac.inputSchema["properties"]["kodlar"]["type"] == "array"
+
+
+@pytest.mark.asyncio
+async def test_belgelerdeki_arac_sayisi_kodla_ayni():
+    """Arac eklendiginde README ve CLAUDE.md guncellenmeyi unutuluyordu;
+    sayi iki kez geride kaldi (16 yazarken 17, sonra 18 arac vardi)."""
+    import io
+    import re
+    from pathlib import Path
+
+    kok = Path(__file__).resolve().parent.parent.parent
+    gercek = len(await sunucu.list_tools())
+    for dosya in ("README.md", "CLAUDE.md"):
+        metin = io.open(kok / dosya, encoding="utf-8").read()
+        # Yalnizca TOPLAM sayiyi bildiren cumleler; "3-4 arac cagirip
+        # duruyor" gibi anlatimlar sayilmaz.
+        yazilanlar = {int(x) for x in re.findall(r"(\d+) araçlı|(\d+) araç\.", metin) for x in x if x}
+        assert yazilanlar, f"{dosya} icinde toplam arac sayisi gecmiyor"
+        assert yazilanlar == {gercek}, f"{dosya}: {yazilanlar} yaziyor, gercek {gercek}"

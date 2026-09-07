@@ -3,7 +3,7 @@
 BIST hakkında serbest Türkçe soruları cevaplayan bir Telegram botu ve onu
 besleyen MCP sunucusu.
 
-- `bist_mcp/` — **16 araçlı MCP sunucusu**; veri İş Yatırım, KAP, yfinance ve
+- `bist_mcp/` — **18 araçlı MCP sunucusu**; veri İş Yatırım, KAP, yfinance ve
   TCMB EVDS'ten gelir.
 - `ajan/` — Telegram botu ve NVIDIA function-calling döngüsü. Bot MCP
   sunucusunu alt süreç olarak başlatır.
@@ -400,14 +400,14 @@ tutarlılığı, hisse adedi uyumu ve oran makullüğü kontrol edilir.
   `X-API-KEY`, `Authorization`) ve anahtarsız istek denendi — hepsi aynı
   HTML. Yani kimlik doğrulama değil, **servis yolu değişmiş**.
 
-  Araç çökmüyor: durumu açıklayan bir mesaj döndürüyor ve diğer 15 araç
+  Araç çökmüyor: durumu açıklayan bir mesaj döndürüyor ve diğer 17 araç
   etkilenmiyor. v3'ün doğru servis yolu bulununca `bist_mcp/kaynaklar/tcmb.py`
   içindeki `EVDS_KOK` güncellenmeli; seri kodları da o zaman doğrulanabilir.
 
   **Enflasyon/faiz dışındaki her şey etkilenmiyor** — döviz, altın ve emtia
   `doviz_altin` aracından yfinance üzerinden anahtarsız geliyor.
 - **İlk açılışta tarama tablosu ~7 dakika kurulur.** O bitene kadar
-  `hisse_tarama` "tablo henüz kurulmadı" der; diğer 15 araç hemen çalışır.
+  `hisse_tarama` "tablo henüz kurulmadı" der; diğer 17 araç hemen çalışır.
 - Döviz/altın EVDS değil **yfinance** kullanır, yani anahtarsız çalışır.
   Gram altın ons fiyatı × USD/TRY ÷ 31,1035 ile hesaplanır; dayanak değerler
   cevapta yer alır.
