@@ -296,6 +296,18 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    ağır. Tur **içinde** sonuçlar zaten uçuş hâlindeki mesaj listesinde, oradan
    etkilenmiyor; sonuçlar diske yazılmaya da devam ediyor.
 
+30. **Hangi hisse olduğu her cevapta görünür.** Ölçüldü: `anlik_fiyat`
+   `unvan` döndürmediği için "thyao kaç tl" cevabı yalnızca "Son fiyat
+   296,00 TL" oluyordu. Artık araç unvanı veriyor ve özet kartının üst
+   satırında kod + unvan yazıyor ("KARSN — KARSAN OTOMOTİV ...").
+
+31. **Veri çekilirken durum mesajı gösterilir.** Detaylı analiz 20-30 sn
+   sürüyor ve kullanıcı bot donmuş sanıyordu. Ajan araçları
+   **çalıştırmadan önce** bildiriyor (sonradan haber vermenin faydası yok),
+   bot tek bir mesajı düzenleyip sonunda siliyor. Aynı metin iki kez
+   gönderilmez — Telegram değişmeyen düzenlemeyi reddediyor — ve bildirim
+   hatası cevabı düşürmez.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce
