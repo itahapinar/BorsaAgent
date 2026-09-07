@@ -42,6 +42,38 @@ ARAC_BLOGU = re.compile(r"<tool_call>.*?</tool_call>?", re.S)
 ARAC_ETIKETI = re.compile(r"</?tool_call>?")
 
 
+def kimlik_ayikla(sonuc_metni: str) -> tuple[str, str | None] | None:
+    """Arac sonucundan (kod, unvan) cikarir; tekil hisse degilse None.
+
+    Olculdu (canli bot): "asels hacim" cevabi yalnizca hacim tablosuydu,
+    hangi hisse oldugu yazmiyordu. Prompt kurali var ama model uymuyor;
+    ozet kartinda oldugu gibi kimlik de kodda ekleniyor.
+    """
+    try:
+        veri = json.loads(sonuc_metni)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(veri, dict):
+        return None
+    kod = veri.get("kod")
+    if not isinstance(kod, str) or not kod.strip():
+        return None
+    unvan = veri.get("unvan")
+    return kod.strip(), unvan.strip() if isinstance(unvan, str) and unvan.strip() else None
+
+
+def kimlik_basligi(kimlikler: dict[str, str | None]) -> str | None:
+    """Tek bir hisse varsa baslik satiri uretir.
+
+    Karsilastirma ve taramada birden fazla hisse doner; tek bir ad yazmak
+    yaniltici olur, o durumda baslik eklenmez.
+    """
+    if len(kimlikler) != 1:
+        return None
+    kod, unvan = next(iter(kimlikler.items()))
+    return f"**{kod} — {unvan}**" if unvan else f"**{kod}**"
+
+
 def cagri_kalintisini_temizle(metin: str) -> str:
     """Modelin cevabina karisan arac cagrisi artiklarini atar."""
     temiz = ARAC_BLOGU.sub("", metin)
@@ -111,9 +143,19 @@ class Ajan:
 
         return list(await asyncio.gather(*(_bir(c) for c in cagrilar)))
 
-    def _kartla(self, kartlar: list[str], cevap: str) -> str:
-        """Kart(lar)i cevabin basina koyar; rakamlar modelden gecmez."""
-        return "\n\n".join([*kartlar, cevap]) if kartlar else cevap
+    def _kartla(self, kartlar: list[str], cevap: str, kimlikler=None) -> str:
+        """Kart(lar)i cevabin basina koyar; rakamlar modelden gecmez.
+
+        Kart yoksa en azindan hangi hisse oldugu yazilir: model bunu
+        kendiliginden yazmiyor (olculdu, "asels hacim" cevabi yalnizca
+        hacim tablosuydu).
+        """
+        ustler = list(kartlar)
+        if not ustler:
+            baslik = kimlik_basligi(kimlikler or {})
+            if baslik:
+                ustler = [baslik]
+        return "\n\n".join([*ustler, cevap]) if ustler else cevap
 
     async def _bildir(self, bildirim, adlar: list[str]) -> None:
         """Durum bildirimi cevabi dusurmemeli; Telegram duzenlemesi hata verebilir."""
@@ -127,6 +169,7 @@ class Ajan:
     async def cevapla(self, soru: str, bildirim=None) -> str:
         self._hafiza.ekle("user", soru)
         kartlar: list[str] = []
+        kimlikler: dict[str, str | None] = {}
 
         araclar = await self._mcp.arac_semalari()
         mesajlar = [{"role": "system", "content": sistem_promptu()}, *self._hafiza.gecmis()]
@@ -144,7 +187,7 @@ class Ajan:
             if not getattr(mesaj, "tool_calls", None):
                 cevap = cagri_kalintisini_temizle(mesaj.content or "") or "Cevap uretemedim."
                 self._hafiza.ekle("assistant", cevap)
-                return self._kartla(kartlar, cevap)
+                return self._kartla(kartlar, cevap, kimlikler)
 
             # Govde ve sonuclar BIRLIKTE kaydedilir. Sonraki turda tool
             # mesaji tool_call_id'siz giderse uc nokta 400 veriyor; govdesi
@@ -166,6 +209,10 @@ class Ajan:
                 kart = kart_ayikla(sonuc["content"])
                 if kart and kart not in kartlar:
                     kartlar.append(kart)
+                kimlik = kimlik_ayikla(sonuc["content"])
+                if kimlik:
+                    kod, unvan = kimlik
+                    kimlikler[kod] = unvan or kimlikler.get(kod)
 
             kayit.info("Tur %d: %d arac calistirildi", tur + 1, len(sonuclar))
 
@@ -180,4 +227,4 @@ class Ajan:
             "Bu soru icin gereken veriyi toplayamadim."
         )
         self._hafiza.ekle("assistant", cevap)
-        return self._kartla(kartlar, cevap)
+        return self._kartla(kartlar, cevap, kimlikler)

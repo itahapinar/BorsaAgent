@@ -365,3 +365,21 @@ def test_ayni_arac_tekrar_yazilmaz():
 
 def test_arac_yoksa_genel_mesaj():
     assert durum_metni([]).strip() != ""
+
+
+def test_ingilizce_binlik_virgul_noktaya_cevrilir():
+    """Olculdu: model "21,183,260 hisse" yazdi; Turkce'de bu yanlis okunur.
+
+    Cevrimden sonra kisaltma devreye giriyor, sonuc "21,18 milyon".
+    """
+    from ajan.bicim import _ingiliz_binligi_duzelt
+
+    assert _ingiliz_binligi_duzelt("Hacim 21,183,260 hisse") == "Hacim 21.183.260 hisse"
+    assert "21,18 milyon" in telegram_html("Hacim 21,183,260 hisse")
+    assert "21,183,260" not in telegram_html("Hacim 21,183,260 hisse")
+
+
+def test_turkce_ondalik_virgul_bozulmaz():
+    """1,54 ve 1,543 ondalik olabilir; tek grupta cevrim yapilmaz."""
+    for sayi in ("1,54", "1,543", "44,799"):
+        assert sayi in telegram_html(f"Deger {sayi} birim")

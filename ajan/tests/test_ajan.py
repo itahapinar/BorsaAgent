@@ -330,3 +330,68 @@ async def test_bildirim_hatasi_cevabi_dusurmez(tmp_path):
     llm = SahteLLM(_fiyat_turu())
     cevap = await _ajan(tmp_path, llm).cevapla("THYAO", bildirim=patlayan)
     assert cevap == "THYAO 296,00 TL"
+
+
+# --- Hisse kimligi basligi -------------------------------------------------
+# Olculdu (canli bot): "asels hacim" cevabi yalnizca "Gun | Hacim" tablosu
+# oldu, hangi hisse oldugu yazmadi. Prompt kurali 16 var ama model uymuyor.
+# Ozet kartinda oldugu gibi kimlik de KODDA ekleniyor.
+
+
+class KimlikliMcp(SahteMcp):
+    def __init__(self, veri):
+        super().__init__()
+        self._veri = veri
+
+    async def cagir(self, ad, argumanlar):
+        self.cagrilanlar.append((ad, argumanlar))
+        return json.dumps(self._veri)
+
+
+async def test_tek_hissede_kimlik_basligi_eklenir(tmp_path):
+    mcp = KimlikliMcp({"kod": "ASELS", "unvan": "ASELSAN A.Ş.", "hacim": 5})
+    llm = SahteLLM(_fiyat_turu(cevap="Hacim 21,18 milyon."))
+    cevap = await _ajan(tmp_path, llm, mcp).cevapla("asels hacim")
+    assert cevap.startswith("**ASELS — ASELSAN A.Ş.**")
+    assert "21,18 milyon" in cevap
+
+
+async def test_unvan_yoksa_kod_yazilir(tmp_path):
+    mcp = KimlikliMcp({"kod": "ASELS", "hacim": 5})
+    llm = SahteLLM(_fiyat_turu(cevap="Hacim 21,18 milyon."))
+    assert (await _ajan(tmp_path, llm, mcp).cevapla("asels hacim")).startswith("**ASELS**")
+
+
+async def test_ozet_karti_varsa_kimlik_tekrarlanmaz(tmp_path):
+    mcp = KimlikliMcp({"kod": "ASELS", "unvan": "ASELSAN A.Ş.", "ozet_kart": KART})
+    llm = SahteLLM(_fiyat_turu(cevap="yorum"))
+    cevap = await _ajan(tmp_path, llm, mcp).cevapla("asels analiz")
+    assert cevap.count("ASELS") <= 1
+    assert cevap.startswith(KART)
+
+
+async def test_kodsuz_sonucta_baslik_eklenmez(tmp_path):
+    mcp = KimlikliMcp({"endeks": "XU100", "deger": 12345})
+    llm = SahteLLM(_fiyat_turu(cevap="BIST 100 12.345 puan."))
+    assert await _ajan(tmp_path, llm, mcp).cevapla("bist 100") == "BIST 100 12.345 puan."
+
+
+async def test_birden_fazla_hissede_baslik_eklenmez(tmp_path):
+    """Karsilastirma ve taramada tek bir hisse adi yazmak yanlis olurdu."""
+
+    class CokluMcp(SahteMcp):
+        async def cagir(self, ad, argumanlar):
+            self.cagrilanlar.append((ad, argumanlar))
+            return json.dumps({"kod": argumanlar.get("kod", "X"), "unvan": "Bir A.Ş."})
+
+    cagrilar = [
+        SahteCagri("anlik_fiyat", '{"kod":"THYAO"}', id="a"),
+        SahteCagri("anlik_fiyat", '{"kod":"ASELS"}', id="b"),
+    ]
+    llm = SahteLLM(
+        [
+            SahteYanit([SahteSecim(SahteMesaj(tool_calls=cagrilar))]),
+            SahteYanit([SahteSecim(SahteMesaj(content="İkisi de geldi."))]),
+        ]
+    )
+    assert await _ajan(tmp_path, llm, CokluMcp()).cevapla("karşılaştır") == "İkisi de geldi."

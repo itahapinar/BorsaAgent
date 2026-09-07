@@ -165,8 +165,10 @@ async def gecmis_fiyat(kod: str, baslangic: str, bitis: str | None = None) -> di
     if not mumlar:
         return {"hata": f"{kod.upper()} icin {baslangic} civarinda fiyat verisi yok."}
     istenen = [m for m in mumlar if m["tarih"] == baslangic]
+    sirket = await _sirket(kod)
     return {
         "kod": kod.upper(),
+        "unvan": sirket.unvan if sirket else None,
         "istenen_tarih": baslangic,
         "istenen_gun_islem_gordu": bool(istenen),
         "gunler": mumlar,
@@ -416,8 +418,10 @@ async def temettu_gecmisi(kod: str, yil: int = 5) -> dict:
         for b in bildirimler
         if any(a in f"{b.get('konu') or ''} {b.get('ozet') or ''}".lower() for a in anahtarlar)
     ]
+    sirket = await _sirket(kod)
     return {
         "kod": kod.upper(),
+        "unvan": sirket.unvan if sirket else None,
         # finansal_oranlar ile AYNI yedegi kullanir; yoksa kart "0,2053 TL"
         # derken bu bolum "veri yok" diyor ve cevap kendiyle celisiyordu.
         **temettu_ozeti(temettu, fiyat_yedekli(canli.get("fiyat"), yedek)),
@@ -481,8 +485,10 @@ async def teknik_analiz(kod: str) -> dict:
         return {"hata": f"{kod.upper()} icin fiyat gecmisi bulunamadi."}
 
     kapanislar = [m["kapanis"] for m in mumlar]
+    sirket = await _sirket(kod)
     return {
         "kod": kod.upper(),
+        "unvan": sirket.unvan if sirket else None,
         "son_kapanis": kapanislar[-1],
         "rsi_14": teknik.rsi(kapanislar),
         "macd": teknik.macd(kapanislar),

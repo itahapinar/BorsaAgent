@@ -328,6 +328,21 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    BIST'te 1 lot = 1 hissedir. Alanlar `*_adet` olarak adlandırıldı ve
    çıktıya `birim` alanı eklendi; uydurma kayboldu.
 
+34. **Hangi hisse olduğu KODDA yazılır, modele bırakılmaz.** Prompt kuralı
+   vardı ama model uymuyordu: "asels hacim" cevabı yalnızca hacim tablosuydu.
+   Ajan, araç sonuçlarındaki `kod`/`unvan` alanlarından tek satırlık bir
+   başlık üretip cevabın başına koyuyor (özet kartı varsa o zaten taşıyor).
+   Kural genel — `ajan/` aracın ne yaptığını bilmez, yalnızca alan adlarını.
+
+   **Birden fazla hisse dönüyorsa başlık eklenmez**; karşılaştırma ve
+   taramada tek bir hisse adı yazmak yanıltıcı olurdu.
+
+35. **Model üç ayrı sayı biçimi hatası yapıyor; üçü de kodda düzeltilir.**
+   Boşluklu binlik (`44 799 808`), İngilizce ondalık (`15.0`) ve İngilizce
+   binlik (`21,183,260`). Sonuncusunda en az **iki** virgül grubu aranır:
+   Türkçe bir ondalıkta iki grup olmaz, ama `1,543` tek gruptur ve ondalık
+   olabilir — ona dokunulmaz.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce

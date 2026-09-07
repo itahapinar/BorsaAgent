@@ -171,6 +171,16 @@ def _ondalik_virgule(metin: str) -> str:
     return ONDALIK_NOKTA.sub(r"\1,\2", metin)
 
 
+# Olculdu: model "21,183,260 hisse" gibi Ingilizce binlik ayirici yaziyor.
+# EN AZ IKI grup aranir: Turkce bir ondalik sayida iki virgul grubu olmaz,
+# ama "1,543" tek gruptur ve ondalik olabilir -- ona dokunulmaz.
+INGILIZ_BINLIK = re.compile(r"(?<![\d,.])(\d{1,3}(?:,\d{3}){2,})(?![\d,])")
+
+
+def _ingiliz_binligi_duzelt(metin: str) -> str:
+    return INGILIZ_BINLIK.sub(lambda e: e.group(1).replace(",", "."), metin)
+
+
 def _kacir(metin: str) -> str:
     return metin.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -292,6 +302,7 @@ def telegram_html(metin: str) -> str:
     metin = yabanci_yaziyi_temizle(metin)
     metin = YATAY_CIZGI.sub("", metin)
     metin = _binlik_ayiriciyi_duzelt(metin)
+    metin = _ingiliz_binligi_duzelt(metin)
     metin = _ondalik_virgule(metin)
     metin = _ham_tutarlari_kisalt(metin)
     govde, tablolar = _tablolari_ayikla(metin)
