@@ -90,6 +90,10 @@ class AnlikGorunum:
         self._baglanti.row_factory = sqlite3.Row
         alanlar = ", ".join(f"{ad} {tip}" for ad, tip in SUTUN_TIPLERI.items())
         self._baglanti.execute(f"CREATE TABLE IF NOT EXISTS gorunum ({alanlar})")
+        self._baglanti.execute(
+            "CREATE TABLE IF NOT EXISTS tarama_durumu ("
+            "  anahtar TEXT PRIMARY KEY, zaman REAL NOT NULL)"
+        )
         self._eksik_sutunlari_ekle()
         self._baglanti.commit()
 
@@ -127,6 +131,31 @@ class AnlikGorunum:
             "SELECT * FROM gorunum WHERE kod = ?", (kod.strip().upper(),)
         ).fetchone()
         return dict(satir) if satir else None
+
+    def tarama_yasi_saat(self) -> float | None:
+        """Son TAMAMLANAN taramanin uzerinden gecen saat; hic yoksa None.
+
+        Kayit sayisina bakmak yerine damga kullanilir: tarama yalnizca fiyat
+        verisi olan hisseleri yaziyor (olculdu: 807 ticker'in 630'u), bu
+        yuzden "kayit/evren orani" hicbir zaman dolmuyordu ve her acilista
+        8 dakikalik tarama bastan kosuyordu.
+        """
+        satir = self._baglanti.execute(
+            "SELECT zaman FROM tarama_durumu WHERE anahtar = 'tam_kurulum'"
+        ).fetchone()
+        return (time.time() - satir["zaman"]) / 3600 if satir else None
+
+    def tarama_bitti_isaretle(self) -> None:
+        """Yalnizca tarama SONUNA kadar gittiyse cagrilir.
+
+        Yarida kesilen tarama damga birakmaz; sonraki acilis eksik tabloyu
+        gorup yeniden kurar.
+        """
+        self._baglanti.execute(
+            "INSERT OR REPLACE INTO tarama_durumu (anahtar, zaman) VALUES ('tam_kurulum', ?)",
+            (time.time(),),
+        )
+        self._baglanti.commit()
 
     def kayit_sayisi(self) -> int:
         return self._baglanti.execute("SELECT COUNT(*) FROM gorunum").fetchone()[0]
@@ -261,4 +290,5 @@ class AnlikGorunum:
             yazilan += 1
 
         await asyncio.gather(*(_bir_hisse(k) for k in toplu), return_exceptions=True)
+        self.tarama_bitti_isaretle()
         return yazilan

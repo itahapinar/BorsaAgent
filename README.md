@@ -343,6 +343,19 @@ Her kural canlı ölçülmüş bir hataya karşılık gelir ve regresyon testi v
    Türkçe bir ondalıkta iki grup olmaz, ama `1,543` tek gruptur ve ondalık
    olabilir — ona dokunulmaz.
 
+36. **Tazeleme kararı kayıt sayısına değil, TAMAMLANMA DAMGASINA bakar.**
+   Ölçüldü (canlı sunucu): tablo 630 hisse içeriyordu, evren 807 ticker.
+   Oran %78 ve eşik %90 olduğu için karar **her açılışta** "tam kurulum
+   gerekli" diyordu — veri taze olsa bile. Tarama ~8 dakika ve ~700 istek;
+   haftalık önbellek hiç devreye girmiyordu ve her yeniden başlatma veri
+   kaynaklarını baştan yoruyordu.
+
+   Sebep 33 numaralı kuralın yan etkisi: tarama yalnızca **fiyat verisi olan**
+   hisseleri yazıyor (807 ticker'ın 630'u), tablo o eşiğe hiçbir zaman
+   ulaşamazdı. Oran tahmini kaldırıldı: biten tarama `tarama_durumu`
+   tablosuna damga bırakır, yarıda kesilen bırakmaz. Karar yalnızca damganın
+   yaşına bakar — hem doğru hem daha basit.
+
 ## Hız sınırları
 
 KAP ve İş Yatırım için **2 istek/sn**. KAP'ta API çağrısından önce

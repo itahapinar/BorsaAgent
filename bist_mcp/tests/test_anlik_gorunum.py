@@ -323,3 +323,41 @@ def test_temettu_bilinmiyorsa_satirda_sifir_yazmaz():
     satir = satir_hesapla(TEMEL, fiyat=296.00, temettu_12ay=None)
     assert satir["temettu_12ay"] is None
     assert satir["temettu_verimi"] is None
+
+
+# --- Tarama tamamlanma damgasi ---------------------------------------------
+# Olculdu (canli sunucu): kayit/evren oranina bakan kontrol, tarama yalnizca
+# fiyat verisi olan hisseleri yazdigi icin (807'nin 630'u) hic tatmin
+# olmuyordu ve her acilista 8 dakikalik tarama bastan kosuyordu.
+
+
+async def test_biten_tarama_damga_birakir(tmp_path):
+    isyatirim = SahteIsYatirim()
+    isyatirim.engel.set()
+    gorunum = AnlikGorunum(
+        tmp_path / "g.db", kap=SahteKap(), isyatirim=isyatirim, fiyat=SahteFiyat()
+    )
+    assert gorunum.tarama_yasi_saat() is None, "bastan damga olmamali"
+
+    await gorunum.tam_kurulum(["AAA", "BBB"])
+    yas = gorunum.tarama_yasi_saat()
+    assert yas is not None and yas < 1.0
+
+
+async def test_yarida_kesilen_tarama_damga_birakmaz(tmp_path):
+    """Damga birakirsa eksik tablo 'tamam' sayilir ve bir hafta oyle kalir."""
+    gorunum, isyatirim = _tarama_gorunumu(tmp_path)
+    gorev = asyncio.create_task(gorunum.tam_kurulum(["AAA", "BBB"]))
+    for _ in range(200):
+        if await _satir_sayisi(gorunum):
+            break
+        await asyncio.sleep(0.01)
+    gorev.cancel()
+    isyatirim.engel.set()
+    try:
+        await gorev
+    except asyncio.CancelledError:
+        pass
+
+    assert await _satir_sayisi(gorunum) == 1, "kismi ilerleme korunmali"
+    assert gorunum.tarama_yasi_saat() is None, "yarim tarama damga birakmamali"
