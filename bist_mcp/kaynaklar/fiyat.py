@@ -59,6 +59,20 @@ def temettu_penceresi(odemeler: list[dict], yil: int, bugun=None) -> list[dict]:
     return sorted(secilen, key=lambda o: o["tarih"], reverse=True)
 
 
+def fiyatli_satirlar(veri):
+    """Kapanis fiyati olmayan satirlari atar.
+
+    Olculdu (TUPRS, 08.09.2026 sabahi): Yahoo 07.09 icin satir donduruyor
+    ama OHLC bos, yalnizca Volume dolu -- seans verisi henuz yayimlanmamis.
+    Bu satiri almak `anlik`ta fiyat=NaN uretiyordu; model NaN'i gorup
+    yanindaki onceki kapanisi aliyor ve YANLIS TARIHLE sunuyordu. Ayni
+    satirlar teknik_analiz'e de sizip son_kapanis ve ma_20'yi NaN yapiyordu.
+    """
+    if veri.empty or "Close" not in veri:
+        return veri
+    return veri[veri["Close"].notna()]
+
+
 def ortalama_hacim_tl(hacimler, kapanislar, gun: int = HACIM_PENCERESI) -> float | None:
     """Son `gun` islem gununun ortalama TL islem hacmi (adet x fiyat).
 
@@ -89,7 +103,9 @@ class FiyatKaynak:
             return onbellekli
 
         def _cek() -> dict:
-            veri = yf.Ticker(bist_sembol(kod)).history(period="5d", interval="1d")
+            veri = fiyatli_satirlar(
+                yf.Ticker(bist_sembol(kod)).history(period="5d", interval="1d")
+            )
             if veri.empty:
                 return {}
             son = veri.iloc[-1]
@@ -127,8 +143,10 @@ class FiyatKaynak:
         bit = dt.date.fromisoformat(bitis) + dt.timedelta(days=5)
 
         def _cek() -> list[dict]:
-            veri = yf.Ticker(bist_sembol(kod)).history(
-                start=str(bas), end=str(bit), interval="1d"
+            veri = fiyatli_satirlar(
+                yf.Ticker(bist_sembol(kod)).history(
+                    start=str(bas), end=str(bit), interval="1d"
+                )
             )
             return [
                 {
@@ -189,8 +207,10 @@ class FiyatKaynak:
             return onbellekli
 
         def _cek() -> list[dict]:
-            veri = yf.Ticker(bist_sembol(kod)).history(
-                start=baslangic, end=bitis, interval=aralik
+            veri = fiyatli_satirlar(
+                yf.Ticker(bist_sembol(kod)).history(
+                    start=baslangic, end=bitis, interval=aralik
+                )
             )
             return [
                 {
